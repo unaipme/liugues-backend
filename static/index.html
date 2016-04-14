@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" type="text/css" media="screen" href="korolev.css" />
+		<link href='https://fonts.googleapis.com/css?family=Slabo+27px' rel='stylesheet' type='text/css'>
+		<link rel="stylesheet" type="text/css" media="screen" href="style.css" />
+		<title>liugues API</title>
+	</head>
+	<body>
+		<div id="header">
+			<h1 class="header_title">liugues <span style="color:white">API</span></h1>
+			<p><span class="korolev_medium">still a work in progress</span>¯\_(ツ)_/¯</p>
+		</div>
+		<div id="content-wrap">
+			<!--<p>Welcome to the homepage of the liugues API!</p>-->
+			<div class="subtitle_cool">
+				<p>By using this API, you can access all the information hosted and updated by liugues. Liugues API provides all its information in JSON format.</p>
+				<p>Below you can find a table with all the developed functionalities, and its URIs. Just make a request to the URIs, with the right parameters and right request type, and you'll receive all the info.</p>
+			</div>
+			<center>
+				<table id="content-table">
+					<tr>
+						<th style="width:35%">URI</th>
+						<th style="width:15%">Request</th>
+						<th>Response</th>
+					</tr>
+					<tr>
+						<td>/g/countries</td>
+						<td>GET</td>
+						<td>List of all countries from which there are leagues registered in liugues.</td>
+					</tr>
+					<tr>
+						<td>/g/leagues</td>
+						<td>GET</td>
+						<td>List of all leagues that are registered in liugues.</td>
+					</tr>
+				</table>
+			</center>
+		</div>
+		<div id="footer">
+			<p id="footer_disclaimer">Design and programming by Unai Perez Mendizabal (unape833). All rights reserved.</p>
+		</div>
+	</body>
+</html>

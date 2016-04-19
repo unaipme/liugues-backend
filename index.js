@@ -146,6 +146,20 @@ app.get("/g/teams", function(req, rsp) {
 	queryResponse(q, rsp);
 });
 
+app.get("/g/users", function(req, rsp) {
+	var params = [];
+	if (Object.size(req.query) >= 1) {
+		if (req.query.id) {
+			params.push("u_id="+req.query.id);
+		}
+		if (req.query.token) {
+			params.push("u_token='"+req.query.token+"'");
+		}
+	}
+	var q = new SQLSelect("l_users", params, "u_name, u_pic");
+	queryResponse(q.generate(), rsp);
+});
+
 //POST request routing
 
 app.post("/p/login", urlenc, function(req, rsp) {
@@ -213,6 +227,81 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 			}));
 			updateDB("UPDATE l_users SET u_lastlogin=NOW() WHERE u_id="+rows[0].u_id);
 		}
+	});
+});
+
+app.post("/p/logout", urlenc, function(req, rsp) {
+	var token = req.body.token;
+	var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);
+	getDataFromDB(q.generate(), function(rows) {
+		if (rows.length === 0) {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "No user was found with that token"
+			}));
+			return;
+		}
+		var id = rows[0].u_id;
+		updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+id);
+		rsp.end(JSON.stringify({
+			error: false,
+			msg: "Logged out successfully"
+		}));
+	});
+});
+
+app.post("/p/pass_ch", urlenc, function(req, rsp) {
+	var token = req.body.token;
+	var old_pass = req.body.old_pass;
+	var new_pass = req.body.new_pass;
+	var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);
+	getDataFromDB(q.generate(), function(rows) {
+		if (rows.length === 0) {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "No user was found with that token"
+			}));
+			return;
+		}
+		var hpass = rows[0].u_password;
+		bcrypt.compare(old_pass, hpass, function(err, m) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+			if (!m) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: "Incorrect password"
+				}));
+				return;
+			}
+			bcrypt.genSalt(10, function(err, salt) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: err.error
+					}));
+					return;
+				}
+				bcrypt.hash(new_pass, salt, function(err, hash) {
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+						return;
+					}
+					updateDB("UPDATE l_users SET u_password='"+hash+"' WHERE u_token='"+token+"'");
+					rsp.end(JSON.stringify({
+						error: false,
+						msg: "Password changed successfully"
+					}));
+				})
+			});
+		});
 	});
 });
 

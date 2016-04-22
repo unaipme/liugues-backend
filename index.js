@@ -28,16 +28,67 @@ app.use(function(req, res, next) {
 
 //@param table: Name of the table from which query data. REQUIRED!
 //@param where: Array of strings with all the conditions that are to meet. Not required.
-//@param cols: A string of all the wanted columns, separated by commas. Not required.
+//@param cols: An array of all the wanted columns, separated by commas. Not required.
 function SQLSelect(table, where, cols) {
 	this.table = table;
 	this.cols = cols || "*";
 	this.where = where || "";
 	this.generate = function() {
-		var q = "SELECT " + this.cols + " FROM " + this.table;
+		var q = "SELECT " + this.cols.toString() + " FROM " + this.table;
 		if (this.where.length > 0) {
 			q += " WHERE " + this.where.toString();
 		}
+		return q;
+	}
+}
+
+//@param table: Name of the table in which to insert the data
+//@param values: Values that will be inserted in an array or matrix, in the same order the columns are.
+//@param cols: Array of all the columns in the right order.
+function SQLInsert(table, values, cols) {
+	this.table = table;
+	this.cols = cols || "";
+	this.values = values;
+	this.generate = function() {
+		var q = "INSERT INTO " + this.table + " (" + this.cols.toString() + ") VALUES ";
+		var manyrows = (typeof this.values[0]) == "object";
+		if (!manyrows) this.values = [this.values];
+		for (var a=0; a<this.values.length; a++) {
+			q += "(";
+			for (var b=0; b<this.values[a].length; b++) {
+				if (typeof this.values[a][b] === "string") q += "'"+this.values[a][b]+"'";
+				else q += this.values[a][b];
+				if (this.values[a].length !== b + 1) q += ",";
+			}
+			q += ")";
+			if (this.values.length !== a + 1) q += ",";
+		}
+		return q;
+	}
+}
+
+//@param table: Name of the table in which to insert the data
+//@param cols: Columns to which assign the new value and the value
+//@param where: Array of query conditions
+function SQLUpdate(table, assigns, where) {
+	this.table = table;
+	this.assigns = assigns;
+	this.where = where;
+	this.generate = function() {
+		var q = "UPDATE "+this.table+" SET "+this.assigns.toString();
+		q += " WHERE " + this.where.join(" AND ");
+		return q;
+	}
+}
+
+//@param table: Name of the table in which to insert the data
+//@param cols: Columns to which assign the new value and the value
+//@param where: Array of query conditions
+function SQLDelete(table, where) {
+	this.table = table;
+	this.where = where;
+	this.generate = function() {
+		var q = "DELETE FROM " + this.table + " WHERE " + this.where.join(" AND ");
 		return q;
 	}
 }
@@ -97,11 +148,11 @@ function getDataFromDB(q, cb) {
 	});
 }
 
-function updateDB(q) {
+function updateDB(q, cb) {
 	getConnection(function(conn) {
 		conn.query(q, function(err) {
 			conn.release();
-			if (err) console.log(err);
+			cb(err);
 		})
 	});
 }
@@ -138,12 +189,12 @@ app.get("/g/leagues", function(req, resp) {
 });
 
 app.get("/g/teams", function(req, rsp) {
-	var q = "SELECT * FROM l_teams";
+	var q = new SQLSelect("l_teams");
 	var validParam = false;
 	if (Object.size(req.query) >= 1) {
 		//Parse params
 	}
-	queryResponse(q, rsp);
+	queryResponse(q.generate(), rsp);
 });
 
 app.get("/g/users", function(req, rsp) {
@@ -156,7 +207,7 @@ app.get("/g/users", function(req, rsp) {
 			params.push("u_token='"+req.query.token+"'");
 		}
 	}
-	var q = new SQLSelect("l_users", params, "u_name, u_pic");
+	var q = new SQLSelect("l_users", params, ["u_name", "u_pic"]);
 	queryResponse(q.generate(), rsp);
 });
 
@@ -184,16 +235,32 @@ app.post("/p/login", urlenc, function(req, rsp) {
 			return;
 		}
 		bcrypt.compare(p, rows[0].u_password, function(err, m) {
-			if (err) return console.log("An error occurred\n", err);
-			var q = new SQLSelect("l_users", ["u_name='"+u+"'"]);
+			if (err) {
+				rsp.end(JSON.stringify({
+					login: false,
+					token: null,
+					msg: "Password or username incorrect"
+				}));
+				return;
+			}
 			var token = genToken();
 			if (m) {
-				rsp.end(JSON.stringify({
-					login: true,
-					token: token,
-					msg: "Login was successful"
-				}));
-				updateDB("UPDATE l_users SET u_token='"+token+"', u_lastlogin=NOW() WHERE u_name='"+u+"'");
+				var q = new SQLUpdate("l_users", ["u_token='"+token+"'", "u_lastlogin=NOW()"], ["u_name='"+u+"'"]);
+				updateDB(q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							login: true,
+							token: token,
+							msg: "Login was successful"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							login: false,
+							token: null,
+							msg: "An error occurred"
+						}));
+					}
+				});
 			} else {
 				rsp.end(JSON.stringify({
 					login: false,
@@ -205,9 +272,11 @@ app.post("/p/login", urlenc, function(req, rsp) {
 	});
 });
 
+/*
 app.post("/p/check_user", urlenc, function(req, rsp) {
 	var token = req.body.token;
-	var q = new SQLSelect("l_users", ["u_token='"+token+"'"], "TIMESTAMPDIFF(MINUTE, u_lastlogin, NOW()) AS mins, u_id");
+	console.log("CHECKUSER");
+	var q = new SQLSelect("l_users", ["u_token='"+token+"'"], ["TIMESTAMPDIFF(MINUTE, u_lastlogin, NOW()) AS mins", "u_id"]);
 	getDataFromDB(q.generate(), function(rows) {
 		if (rows.length === 0) {
 			rsp.end(JSON.stringify({
@@ -219,16 +288,21 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 				login:false, 
 				msg: "Your session has expired"
 			}));
+			var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+rows[0].u_id]);
+			console.log(q.generate());
 			updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id);
 		} else {
 			rsp.end(JSON.stringify({
 				login: true,
 				msg: "No problem"
 			}));
+			var q = new SQLUpdate("l_users", ["u_lastlogin=NOW()"], ["u_id="+rows[0].u_id]);
+			console.log(q.generate());
 			updateDB("UPDATE l_users SET u_lastlogin=NOW() WHERE u_id="+rows[0].u_id);
 		}
 	});
 });
+*/
 
 app.post("/p/logout", urlenc, function(req, rsp) {
 	var token = req.body.token;
@@ -242,11 +316,20 @@ app.post("/p/logout", urlenc, function(req, rsp) {
 			return;
 		}
 		var id = rows[0].u_id;
-		updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+id);
-		rsp.end(JSON.stringify({
-			error: false,
-			msg: "Logged out successfully"
-		}));
+		var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Logged out successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
 	});
 });
 
@@ -294,15 +377,145 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 						}));
 						return;
 					}
-					updateDB("UPDATE l_users SET u_password='"+hash+"' WHERE u_token='"+token+"'");
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "Password changed successfully"
-					}));
+					var q = new SQLUpdate("l_users", ["u_password='"+hash+"'"], ["u_token='"+token+"'"]);
+					updateDB(q.generate(), function(err) {
+						if (!err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								msg: "Password changed successfully"
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: err.error
+							}));
+						}
+					});
 				})
 			});
 		});
 	});
+});
+
+app.post("/p/register", urlenc, function(req, rsp) {
+	var n = req.body.username;
+	var p = req.body.password;
+	bcrypt.genSalt(10, function(err, salt) {
+		if (err) {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: err.error
+			}));
+			return;
+		}
+		bcrypt.hash(p, salt, function(err, hash) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+				return;
+			}
+			var q = new SQLInsert("l_users", [n, hash], ["u_name", "u_password"]);
+			updateDB(q.generate(), function(err) {
+				if (!err) {
+					rsp.end(JSON.stringify({
+						error: false,
+						msg: "User created successfully"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error:true,
+						msg: err.error
+					}));
+				}
+			});
+		});
+	});
+});
+
+app.post("/p/ch_country", urlenc, function(req, rsp) {
+	var id = req.body.c_id;
+	if (id === undefined) {
+		var cols = [];
+		var values = [];
+		if (Object.size(req.body) >= 1) {
+			if (req.body.c_name) {
+				cols.push("c_name");
+				values.push(req.body.c_name);
+			}
+			if (req.body.c_flag) {
+				cols.push("c_flag");
+				values.push(req.body.c_flag);
+			}
+			var q = new SQLInsert("l_countries", values, cols);
+			updateDB(q.generate(), function(err) {
+				if (!err) {
+					rsp.end(JSON.stringify({
+						error: false,
+						msg: "New country created correctly"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: err.error
+					}));
+				}
+			});
+		} else {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "Not enough information to create a country instance"
+			}));
+		}
+	} else {
+		var asgs = [];
+		if (req.body.c_name) {
+			asgs.push("c_name='"+req.body.c_name+"'");
+		}
+		if (req.body.c_flag) {
+			asgs.push("c_flag='"+req.body.c_flag+"'");
+		}
+		var q = new SQLUpdate("l_countries", asgs, ["c_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Country updated successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
+	}
+});
+
+app.post("/p/del_country", urlenc, function(req, rsp) {
+	var id = req.body.c_id;
+	if (id !== undefined) {
+		var q = new SQLDelete("l_countries", ["c_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Country deleted successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			msg: "The country's ID is required"
+		}));
+	}
 });
 
 app.listen(process.env.PORT || 5000, function() {

@@ -271,11 +271,9 @@ app.post("/p/login", urlenc, function(req, rsp) {
 		});
 	});
 });
-
-/*
+//
 app.post("/p/check_user", urlenc, function(req, rsp) {
 	var token = req.body.token;
-	console.log("CHECKUSER");
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"], ["TIMESTAMPDIFF(MINUTE, u_lastlogin, NOW()) AS mins", "u_id"]);
 	getDataFromDB(q.generate(), function(rows) {
 		if (rows.length === 0) {
@@ -284,26 +282,33 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 				msg: "No user was found with that token"
 			}));
 		} else if (rows[0].mins >= 60) {
-			rsp.end(JSON.stringify({
-				login:false, 
-				msg: "Your session has expired"
-			}));
 			var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+rows[0].u_id]);
 			console.log(q.generate());
-			updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id);
+			updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id, function(err) {
+				rsp.end(JSON.stringify({
+					login:false, 
+					msg: "Your session has expired"
+				}));
+			});
 		} else {
-			rsp.end(JSON.stringify({
-				login: true,
-				msg: "No problem"
-			}));
 			var q = new SQLUpdate("l_users", ["u_lastlogin=NOW()"], ["u_id="+rows[0].u_id]);
-			console.log(q.generate());
-			updateDB("UPDATE l_users SET u_lastlogin=NOW() WHERE u_id="+rows[0].u_id);
+			updateDB(q.generate(), function(err) {
+				if (!err) {
+					rsp.end(JSON.stringify({
+						login: true,
+						msg: "No problem"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						login: false,
+						msg: err.error
+					}));
+				}
+			});
 		}
 	});
 });
-*/
-
+//
 app.post("/p/logout", urlenc, function(req, rsp) {
 	var token = req.body.token;
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);

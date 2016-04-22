@@ -272,10 +272,9 @@ app.post("/p/login", urlenc, function(req, rsp) {
 	});
 });
 
-/*
+
 app.post("/p/check_user", urlenc, function(req, rsp) {
 	var token = req.body.token;
-	console.log("CHECKUSER");
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"], ["TIMESTAMPDIFF(MINUTE, u_lastlogin, NOW()) AS mins", "u_id"]);
 	getDataFromDB(q.generate(), function(rows) {
 		if (rows.length === 0) {
@@ -302,7 +301,6 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 		}
 	});
 });
-*/
 
 app.post("/p/logout", urlenc, function(req, rsp) {
 	var token = req.body.token;

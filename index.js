@@ -283,7 +283,6 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 			}));
 		} else if (rows[0].mins >= 60) {
 			var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+rows[0].u_id]);
-			console.log(q.generate());
 			updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id, function(err) {
 				rsp.end(JSON.stringify({
 					login:false, 
@@ -423,6 +422,7 @@ app.post("/p/register", urlenc, function(req, rsp) {
 			}
 			var q = new SQLInsert("l_users", [n, hash], ["u_name", "u_password"]);
 			updateDB(q.generate(), function(err) {
+				console.log(err);
 				if (!err) {
 					rsp.end(JSON.stringify({
 						error: false,
@@ -431,7 +431,7 @@ app.post("/p/register", urlenc, function(req, rsp) {
 				} else {
 					rsp.end(JSON.stringify({
 						error:true,
-						msg: err.error
+						msg: err
 					}));
 				}
 			});
@@ -519,6 +519,97 @@ app.post("/p/del_country", urlenc, function(req, rsp) {
 		rsp.end(JSON.stringify({
 			error: true,
 			msg: "The country's ID is required"
+		}));
+	}
+});
+
+app.post("/p/ch_league", urlenc, function(req, rsp) {
+	var id = req.body.l_id;
+	if (id === undefined) {
+		var cols = [];
+		var values = [];
+		if (Object.size(req.body) >= 1) {
+			if (req.body.l_name) {
+				cols.push("l_name");
+				values.push(req.body.l_name);
+			}
+			if (req.body.l_logo) {
+				cols.push("l_logo");
+				values.push(req.body.l_logo);
+			}
+			if (req.body.l_country) {
+				cols.push("l_country");
+				values.push(req.body.l_country);
+			}
+			var q = new SQLInsert("l_leagues", values, cols);
+			updateDB(q.generate(), function(err) {
+				if (!err) {
+					rsp.end(JSON.stringify({
+						error: false,
+						msg: "New league created correctly"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: err.error
+					}));
+				}
+			});
+		} else {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "Not enough information to create a league instance"
+			}));
+		}
+	} else {
+		var asgs = [];
+		if (req.body.l_name) {
+			asgs.push("l_name='"+req.body.l_name+"'");
+		}
+		if (req.body.l_logo) {
+			asgs.push("l_logo='"+req.body.l_logo+"'");
+		}
+		if (req.body.l_country) {
+			asgs.push("l_country="+req.body.l_country);
+		}
+		var q = new SQLUpdate("l_leagues", asgs, ["l_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "League updated successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
+	}
+});
+
+app.post("/p/del_league", urlenc, function(req, rsp) {
+	var id = req.body.l_id;
+	if (id !== undefined) {
+		var q = new SQLDelete("l_leagues", ["l_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "League deleted successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			msg: "The league's ID is required"
 		}));
 	}
 });

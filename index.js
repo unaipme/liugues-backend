@@ -118,7 +118,7 @@ function getConnection(cb) {
 			rsp.end();
 			return;
 		}
-		conn.release();
+		//conn.release();
 		console.log("Connected successfully");		
 		cb(conn);
 	});

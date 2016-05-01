@@ -127,12 +127,13 @@ function getConnection(cb) {
 function queryResponse(q, rsp) {
 	getConnection(function(conn) {
 		conn.query(q, function(err, rows) {
-			conn.release();
-			if (!err) {
-				rsp.end(JSON.stringify(rows));
+			if (err) {
+				console.log(err);
+				rsp.end();
 				return;
 			}
-			rsp.end();
+			conn.release();
+			rsp.end(JSON.stringify(rows));
 		});
 	});
 }
@@ -140,10 +141,12 @@ function queryResponse(q, rsp) {
 function getDataFromDB(q, cb) {
 	getConnection(function(conn) {
 		conn.query(q, function(err, rows) {
+			if (err) {
+				console.log(err);
+				return;
+			}
 			conn.release();
-			if (!err) {
-				cb(rows);
-			} else console.log(err);
+			cb(rows);
 		});
 	});
 }
@@ -151,6 +154,10 @@ function getDataFromDB(q, cb) {
 function updateDB(q, cb) {
 	getConnection(function(conn) {
 		conn.query(q, function(err) {
+			if (err) {
+				console.log(err);
+				return;
+			}
 			conn.release();
 			cb(err);
 		})

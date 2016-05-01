@@ -211,6 +211,23 @@ app.get("/g/users", function(req, rsp) {
 	queryResponse(q.generate(), rsp);
 });
 
+app.get("/g/seasons", function(req, rsp) {
+	var params = [];
+	if (Object.size(req.query) >= 1) {
+		if (req.query.s_id) {
+			params.push("s_id="+req.query.s_id);
+		}
+		if (req.query.s_league) {
+			params.push("s_league="+req.query.s_league);
+		}
+		if (req.query.s_year) {
+			params.push("s_year="+req.query.s_year);
+		}
+	}
+	var q = new SQLSelect("l_seasons", params);
+	queryResponse(q.generate(), rsp);
+});
+
 //POST request routing
 
 app.post("/p/login", urlenc, function(req, rsp) {
@@ -610,6 +627,94 @@ app.post("/p/del_league", urlenc, function(req, rsp) {
 		rsp.end(JSON.stringify({
 			error: true,
 			msg: "The league's ID is required"
+		}));
+	}
+});
+
+app.post("/p/ch_season", urlenc, function(req, rsp) {
+	var id = req.body.s_id;
+	if (id === undefined) {
+		var cols = [];
+		var values = [];
+		if (Object.size(req.body) >= 1) {
+			if (req.body.s_desc) {
+				cols.push("s_desc");
+				values.push(req.body.s_desc);
+			}
+			if (req.body.s_year) {
+				cols.push("s_year");
+				values.push(parseInt(req.body.s_year));
+			}
+			if (req.body.s_league) {
+				cols.push("s_league");
+				values.push(parseInt(req.body.s_league));
+			}
+			var q = new SQLInsert("l_seasons", values, cols);
+			updateDB(q.generate(), function(err) {
+				if (!err) {
+					rsp.end(JSON.stringify({
+						error: false,
+						msg: "New season created correctly"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: err.error
+					}));
+				}
+			});
+		} else {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "Not enough information to create a season instance"
+			}));
+		}
+	} else {
+		var asgs = [];
+		if (req.body.s_desc) {
+			asgs.push("s_desc='"+req.body.s_desc+"'");
+		}
+		if (req.body.s_year) {
+			asgs.push("s_year="+req.body.s_year);
+		}
+		var q = new SQLUpdate("l_seasons", asgs, ["s_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Season updated successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err
+				}));
+			}
+		});
+	}
+});
+
+app.post("/p/del_season", urlenc, function(req, rsp) {
+	var id = req.body.s_id;
+	if (id !== undefined) {
+		var q = new SQLDelete("l_seasons", ["s_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Season deleted successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			msg: "The season's ID is required"
 		}));
 	}
 });

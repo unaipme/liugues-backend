@@ -115,10 +115,8 @@ function getConnection(cb) {
 	pool.getConnection(function(err, conn) {
 		if (err) {
 			console.log("Error happened\n", err);
-			rsp.end();
 			return;
 		}
-		//conn.release();
 		console.log("Connected successfully");		
 		cb(conn);
 	});

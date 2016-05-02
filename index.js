@@ -724,6 +724,106 @@ app.post("/p/del_season", urlenc, function(req, rsp) {
 	}
 });
 
+app.post("/p/ch_team", urlenc, function(req, rsp) {
+	var id = req.body.t_id;
+	if (id === undefined) {
+		var cols = [];
+		var values = [];
+		if (Object.size(req.body) >= 1) {
+			if (req.body.t_name) {
+				cols.push("t_name");
+				values.push(req.body.t_name);
+			}
+			if (req.body.t_crest) {
+				cols.push("t_crest");
+				values.push(req.body.t_crest);
+			}
+			if (req.body.t_country) {
+				cols.push("t_country");
+				values.push(req.body.t_country);
+			}
+			if (req.body.t_stadium) {
+				cols.push("t_stadium");
+				values.push(req.body.t_stadium);
+			}
+			if (req.body.t_city) {
+				cols.push("t_city");
+				values.push(req.body.t_city);
+			}
+			var q = new SQLInsert("l_teams", values, cols);
+			updateDB(q.generate(), function(err) {
+				if (!err) {
+					rsp.end(JSON.stringify({
+						error: false,
+						msg: "New team created correctly"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: err.error
+					}));
+				}
+			});
+		} else {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "Not enough information to create a team instance"
+			}));
+		}
+	} else {
+		var asgs = [];
+		if (req.body.t_name)
+			asgs.push("t_name='"+req.body.t_name+"'");
+		if (req.body.t_crest)
+			asgs.push("t_crest='"+req.body.t_crest+"'");
+		if (req.body.t_country)
+			asgs.push("t_country="+req.body.t_country);
+		if (req.body.t_stadium)
+			asgs.push("t_stadium='"+req.body.t_stadium+"'");
+		if (req.body.t_city)
+			asgs.push("t_city='"+req.body.t_city+"'");
+		var q = new SQLUpdate("l_teams", asgs, ["t_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Team updated successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err
+				}));
+			}
+		});
+	}
+});
+
+app.post("/p/del_team", urlenc, function(req, rsp) {
+	var id = req.body.t_id;
+	if (id !== undefined) {
+		var q = new SQLDelete("l_teams", ["t_id="+id]);
+		updateDB(q.generate(), function(err) {
+			if (!err) {
+				rsp.end(JSON.stringify({
+					error: false,
+					msg: "Team deleted successfully"
+				}));
+			} else {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			msg: "The team's ID is required"
+		}));
+	}
+});
+
 app.listen(process.env.PORT || 5000, function() {
 	console.log("Listening to port 5000");
 });

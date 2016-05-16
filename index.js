@@ -126,6 +126,7 @@ function getDataFromDB(q, cb) {
 	getConnection(function(conn) {
 		conn.query(q, function(err, rows) {
 			conn.release();
+			//conn.destroy();
 			if (err) throw err;
 			cb(rows);
 		});
@@ -135,8 +136,9 @@ function getDataFromDB(q, cb) {
 function updateDB(q, cb) {
 	getConnection(function(conn) {
 		conn.query(q, function(err) {
-			if (err) throw err;
 			conn.release();
+			//conn.destroy();
+			if (err) throw err;
 			cb(err);
 		})
 	});
@@ -202,15 +204,22 @@ app.get("/g/teams", function(req, rsp) {
 	var validParam = false;
 	if (Object.size(req.query) >= 1) {
 		if (req.query.t_id) {
-			var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, "s.*");
-			getDataFromDB(q1.generate(), function(rows) {
-				var q2 = new SQLSelect("l_teams", "t_id="+req.query.t_id);
-				getDataFromDB(q2.generate(), function(rows2) {
-					var r = rows2[0];
-					r.seasons = rows;
-					rsp.end(JSON.stringify(r));
+			try {
+				var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, "s.*");
+				getDataFromDB(q1.generate(), function(rows) {
+					var q2 = new SQLSelect("l_teams", "t_id="+req.query.t_id);
+					getDataFromDB(q2.generate(), function(rows2) {
+						var r = rows2[0];
+						r.seasons = rows;
+						rsp.end(JSON.stringify(r));
+					});
 				});
-			});
+			} catch (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: err.error
+				}));
+			}
 		}
 	} else {
 		var q = new SQLSelect("l_teams");
@@ -391,7 +400,7 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 		});
 	} catch (err) {
 		rsp.end(JSON.stringify({
-			error: true,
+			login: false,
 			msg: err.error
 		}));
 	}

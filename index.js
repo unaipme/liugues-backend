@@ -113,36 +113,27 @@ function genToken() {
 
 function getConnection(cb) {
 	pool.getConnection(function(err, conn) {
-		console.log("Connected successfully");		
-		cb(conn, err);
-	});
-}
-
-function getDataFromDB(q, cb) {
-	getConnection(function(conn, err) {
+		//console.log("Connected successfully");
 		if (err) {
-			cb({}, err);
+			console.log(err);
 		} else {
-			conn.query(q, function(err, rows) {
-				conn.release();
-				if (err) throw err;
-				cb(rows);
-			});
+			console.log("Connected successfully");
+			cb(conn, err);
 		}
 	});
 }
 
-function updateDB(q, cb) {
-	getConnection(function(conn, err) {
-		if (err) {
-			cb(err);
-		} else {
-			conn.query(q, function(err) {
-				conn.release();
-				if (err) throw err;
-				cb(err);
-			});
-		}
+function getDataFromDB(conn, q, cb) {
+	conn.query(q, function(err, rows) {
+		if (err) throw err;
+		cb(rows);
+	});
+}
+
+function updateDB(conn, q, cb) {
+	conn.query(q, function(err) {
+		if (err) throw err;
+		cb(err);
 	});
 }
 
@@ -163,18 +154,28 @@ app.get("/g/countries", function(req, rsp) {
 		}
 	}
 	var q = new SQLSelect("l_countries", params);
-	getDataFromDB(q.generate(), function(rows, err) {
+	getConnection(function(conn, err) {
 		if (err) {
-			rsp.end(JSON.stringify({
-				error: true,
-				data: err
-			}));
-		} else {
 			rsp.end(JSON.stringify({
 				error: false,
 				data: rows
 			}));
+		} else {
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: err
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rows
+					}));
+				}
+			});
 		}
+		conn.release();
 	});
 });
 
@@ -186,67 +187,96 @@ app.get("/g/leagues", function(req, rsp) {
 		}
 	}
 	var q = new SQLSelect("l_leagues", params);
-	getDataFromDB(q.generate(), function(rows, err) {
+	getConnection(function(conn, err) {
 		if (err) {
-			rsp.end(JSON.stringify({
-				error: true,
-				data: err
-			}));
-		} else {
 			rsp.end(JSON.stringify({
 				error: false,
 				data: rows
 			}));
-		}
-	});
-});
-
-app.get("/g/teams", function(req, rsp) {
-	var q = new SQLSelect("l_teams");
-	var validParam = false;
-	if (Object.size(req.query) >= 1) {
-		if (req.query.t_id) {
-			var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, "s.*");
-			getDataFromDB(q1.generate(), function(rows, err) {
+		} else {
+			getDataFromDB(conn, q.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
 						data: err
 					}));
 				} else {
-					var q2 = new SQLSelect("l_teams", "t_id="+req.query.t_id);
-					getDataFromDB(q2.generate(), function(rows2, err2) {
-						if (err2) {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rows
+					}));
+				}
+			});
+		}
+		conn.release();
+	});
+});
+
+app.get("/g/teams", function(req, rsp) {
+	var q = new SQLSelect("l_teams");
+	if (Object.size(req.query) >= 1) {
+		if (req.query.t_id) {
+			getConnection(function(conn, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: err
+					}));
+				} else {
+					var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, "s.*");
+					getDataFromDB(conn, q1.generate(), function(rows, err) {
+						if (err) {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err2
+								data: err
 							}));
 						} else {
-							var r = rows2[0];
-							r.seasons = rows;
-							rsp.end(JSON.stringify({
-								error: false,
-								data: r
-							}));
+							var q2 = new SQLSelect("l_teams", "t_id="+req.query.t_id);
+							getDataFromDB(conn, q2.generate(), function(rows2, err2) {
+								if (err2) {
+									rsp.end(JSON.stringify({
+										error: true,
+										data: err2
+									}));
+								} else {
+									var r = rows2[0];
+									r.seasons = rows;
+									rsp.end(JSON.stringify({
+										error: false,
+										data: r
+									}));
+								}
+							});
 						}
 					});
 				}
+				conn.release();
 			});
 		}
 	} else {
 		var q = new SQLSelect("l_teams");
-		getDataFromDB(q.generate(), function(rows, err) {
+		getConnection(function(conn, err) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
 					data: err
 				}));
 			} else {
-				rsp.end(JSON.stringify({
-					error: false,
-					data: rows
-				}));
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: true,
+							data: err
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: false,
+							data: rows
+						}));
+					}
+				});
 			}
+			conn.release();
 		});
 	}
 });
@@ -261,19 +291,29 @@ app.get("/g/users", function(req, rsp) {
 			params.push("u_token='"+req.query.token+"'");
 		}
 	}
-	var q = new SQLSelect("l_users", params, ["u_name", "u_pic"]);
-	getDataFromDB(q.generate(), function(rows, err) {
+	getConnection(function(conn, err) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
 				data: err
 			}));
 		} else {
-			rsp.end(JSON.stringify({
-				error: false,
-				data: rows
-			}));
+			var q = new SQLSelect("l_users", params, ["u_name", "u_pic"]);
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: err
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rows
+					}));
+				}
+			});
 		}
+		conn.release();
 	});
 });
 
@@ -291,18 +331,65 @@ app.get("/g/seasons", function(req, rsp) {
 		}
 	}
 	params.push("l.l_id=s.s_league");
-	var q = new SQLSelect("l_seasons s, l_leagues l", params, "s.*, l.l_country");
-	getDataFromDB(q.generate(), function(rows, err) {
+	getConnection(function(conn, err) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
 				data: err
 			}));
 		} else {
+			var q = new SQLSelect("l_seasons s, l_leagues l", params, "s.*, l.l_country");
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: err
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rows
+					}));
+				}
+			});
+		}
+		conn.release();
+	});
+});
+
+app.get("/g/rounds", function(req, rsp) {
+	var params = [];
+	if (Object.size(req.query) >= 1) {
+		if (req.query.r_id) {
+			params.push("r_id="+req.query.r_id);
+		}
+		if (req.query.r_season) {
+			params.push("r_season="+req.query.r_season);
+		}
+	}
+	var q = new SQLSelect("l_rounds", params);
+	getConnection(function(conn, err) {
+		if (err) {
 			rsp.end(JSON.stringify({
-				error: false,
-				data: rows
+				error: true,
+				data: err
 			}));
+			conn.release();
+		} else {
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: err
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rows
+					}));
+				}
+				conn.release();
+			});
 		}
 	});
 });
@@ -318,103 +405,133 @@ app.post("/p/login", urlenc, function(req, rsp) {
 			token: null,
 			msg: "Password or username missing in the request"
 		}));
-		return;
-	}
-	var q = new SQLSelect("l_users", ["u_name='"+u+"'"]);
-	getDataFromDB(q.generate(), function(rows, err) {
-		if (err) {
-			rsp.end(JSON.stringify({
-				login: false,
-				token: null,
-				msg: "An error occurred"
-			}));
-		} else {
-			if (rows.length === 0) {
+	} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					login: false,
 					token: null,
-					msg: "Password or username incorrect"
+					msg: "An error occurred"
 				}));
-				return;
-			}
-			bcrypt.compare(p, rows[0].u_password, function(err, m) {
-				if (err) {
-					rsp.end(JSON.stringify({
-						login: false,
-						token: null,
-						msg: "Password or username incorrect"
-					}));
-					return;
-				}
-				var token = genToken();
-				if (m) {
-					var q = new SQLUpdate("l_users", ["u_token='"+token+"'", "u_lastlogin=NOW()"], ["u_name='"+u+"'"]);
-					updateDB(q.generate(), function(err) {
-						if (!err) {
-							rsp.end(JSON.stringify({
-								login: true,
-								token: token,
-								msg: "Login was successful"
-							}));
-						} else {
+				conn.release();
+			} else {
+				var q = new SQLSelect("l_users", ["u_name='"+u+"'"]);
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					if (err) {
+						rsp.end(JSON.stringify({
+							login: false,
+							token: null,
+							msg: "An error occurred"
+						}));
+						conn.release();
+					} else {
+						if (rows.length === 0) {
 							rsp.end(JSON.stringify({
 								login: false,
 								token: null,
-								msg: "An error occurred"
+								msg: "Password or username incorrect"
 							}));
+							conn.release();
+						} else {
+							bcrypt.compare(p, rows[0].u_password, function(err, m) {
+								if (err) {
+									rsp.end(JSON.stringify({
+										login: false,
+										token: null,
+										msg: "Password or username incorrect"
+									}));
+									conn.release();
+								} else {
+									console.log("login");
+									var token = genToken();
+									if (m) {
+										var q = new SQLUpdate("l_users", ["u_token='"+token+"'", "u_lastlogin=NOW()"], ["u_name='"+u+"'"]);
+										updateDB(conn, q.generate(), function(err) {
+											if (!err) {
+												rsp.end(JSON.stringify({
+													login: true,
+													token: token,
+													msg: "Login was successful"
+												}));
+											} else {
+												rsp.end(JSON.stringify({
+													login: false,
+													token: null,
+													msg: "An error occurred"
+												}));
+											}
+											conn.release();
+										});
+									} else {
+										rsp.end(JSON.stringify({
+											login: false,
+											token: null,
+											msg: "Password or username incorrect"
+										}));
+										conn.release();
+									}
+								}
+							});
 						}
-					});
-				} else {
-					rsp.end(JSON.stringify({
-						login: false,
-						token: null,
-						msg: "Password or username incorrect"
-					}));
-				}
-			});
-		}
-	});
+					}
+				});
+			}
+		});
+	}
 });
 
 app.post("/p/check_user", urlenc, function(req, rsp) {
 	var token = req.body.token;
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"], ["TIMESTAMPDIFF(MINUTE, u_lastlogin, NOW()) AS mins", "u_id"]);
-	getDataFromDB(q.generate(), function(rows, err) {
+	getConnection(function(conn, err) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				login: false,
 				msg: "An error occurred"
 			}));
 		} else {
-			if (rows.length === 0) {
-				rsp.end(JSON.stringify({
-					login: false,
-					msg: "No user was found with that token"
-				}));
-			} else if (rows[0].mins >= 60) {
-				var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+rows[0].u_id]);
-				updateDB("UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id, function(err) {
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				if (err) {
 					rsp.end(JSON.stringify({
-						login:false, 
-						msg: "Your session has expired"
+						login: false,
+						msg: "An error occurred"
 					}));
-				});
-			} else {
-				var q = new SQLUpdate("l_users", ["u_lastlogin=NOW()"], ["u_id="+rows[0].u_id]);
-				updateDB(q.generate(), function(err) {
-					if (!err) {
-						rsp.end(JSON.stringify({
-							login: true,
-							msg: "No problem"
-						}));
-					} else {
+					conn.release();
+				} else {
+					if (rows.length === 0) {
 						rsp.end(JSON.stringify({
 							login: false,
-							msg: err.error
+							msg: "No user was found with that token"
 						}));
+						conn.release();
+					} else if (rows[0].mins >= 60) {
+						var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+rows[0].u_id]);
+						updateDB(conn, "UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id, function(err) {
+							rsp.end(JSON.stringify({
+								login:false, 
+								msg: "Your session has expired"
+							}));
+						});
+						conn.release();
+					} else {
+						var q = new SQLUpdate("l_users", ["u_lastlogin=NOW()"], ["u_id="+rows[0].u_id]);
+						updateDB(conn, q.generate(), function(err) {
+							if (!err) {
+								rsp.end(JSON.stringify({
+									login: true,
+									msg: "No problem"
+								}));
+							} else {
+								rsp.end(JSON.stringify({
+									login: false,
+									msg: err.error
+								}));
+							}
+							conn.release();
+						});
 					}
-				});
-			}
+				}
+			});
 		}
 	});
 });
@@ -422,95 +539,36 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 app.post("/p/logout", urlenc, function(req, rsp) {
 	var token = req.body.token;
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);
-	getDataFromDB(q.generate(), function(rows, err) {
+	getConnection(function(conn, err) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
 				msg: "An error occurred"
 			}));
+			conn.release();
 		} else {
-			if (rows.length === 0) {
-				rsp.end(JSON.stringify({
-					error: true,
-					msg: "No user was found with that token"
-				}));
-				return;
-			}
-			var id = rows[0].u_id;
-			var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+id]);
-			updateDB(q.generate(), function(err) {
-				if (!err) {
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "Logged out successfully"
-					}));
-				} else {
-					rsp.end(JSON.stringify({
-						error: true,
-						msg: err.error
-					}));
-				}
-			});
-		}
-	});
-});
-
-app.post("/p/pass_ch", urlenc, function(req, rsp) {
-	var token = req.body.token;
-	var old_pass = req.body.old_pass;
-	var new_pass = req.body.new_pass;
-	var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);
-	getDataFromDB(q.generate(), function(rows, err) {
-		if (err) {
-			rsp.end(JSON.stringify({
-				error: true,
-				msg: "An error occurred"
-			}));
-		} else {
-			if (rows.length === 0) {
-				rsp.end(JSON.stringify({
-					error: true,
-					msg: "No user was found with that token"
-				}));
-				return;
-			}
-			var hpass = rows[0].u_password;
-			bcrypt.compare(old_pass, hpass, function(err, m) {
+			getDataFromDB(conn, q.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						msg: "An error occurred"
 					}));
-				}
-				if (!m) {
-					rsp.end(JSON.stringify({
-						error: true,
-						msg: "Incorrect password"
-					}));
-					return;
-				}
-				bcrypt.genSalt(10, function(err, salt) {
-					if (err) {
+					conn.release();
+				} else {
+					if (rows.length === 0) {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							msg: "No user was found with that token"
 						}));
-						return;
-					}
-					bcrypt.hash(new_pass, salt, function(err, hash) {
-						if (err) {
-							rsp.end(JSON.stringify({
-								error: true,
-								msg: err.error
-							}));
-							return;
-						}
-						var q = new SQLUpdate("l_users", ["u_password='"+hash+"'"], ["u_token='"+token+"'"]);
-						updateDB(q.generate(), function(err) {
+						conn.release();
+					} else {
+						var id = rows[0].u_id;
+						var q = new SQLUpdate("l_users", ["u_token=NULL"], ["u_id="+id]);
+						updateDB(conn, q.generate(), function(err) {
 							if (!err) {
 								rsp.end(JSON.stringify({
 									error: false,
-									msg: "Password changed successfully"
+									msg: "Logged out successfully"
 								}));
 							} else {
 								rsp.end(JSON.stringify({
@@ -518,9 +576,98 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 									msg: err.error
 								}));
 							}
+							conn.release();
 						});
-					})
-				});
+					}
+				}
+			});
+		}
+	});
+});
+
+app.post("/p/pass_ch", urlenc, function(req, rsp) {
+	getConnection(function(conn, err) {
+		if (err) {
+			rsp.end(JSON.stringify({
+				error: true,
+				msg: "An error occurred"
+			}));
+			conn.release();
+		} else {
+			var token = req.body.token;
+			var old_pass = req.body.old_pass;
+			var new_pass = req.body.new_pass;
+			var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: "An error occurred"
+					}));
+					conn.release();
+				} else {
+					if (rows.length === 0) {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: "No user was found with that token"
+						}));
+						conn.release();
+					} else {
+						var hpass = rows[0].u_password;
+						bcrypt.compare(old_pass, hpass, function(err, m) {
+							if (err) {
+								rsp.end(JSON.stringify({
+									error: true,
+									msg: err.error
+								}));
+								conn.release();
+							}
+							if (!m) {
+								rsp.end(JSON.stringify({
+									error: true,
+									msg: "Incorrect password"
+								}));
+								conn.release();
+							} else {
+								bcrypt.genSalt(10, function(err, salt) {
+									if (err) {
+										rsp.end(JSON.stringify({
+											error: true,
+											msg: err.error
+										}));
+										conn.release();
+									} else {
+										bcrypt.hash(new_pass, salt, function(err, hash) {
+											if (err) {
+												rsp.end(JSON.stringify({
+													error: true,
+													msg: err.error
+												}));
+												conn.release();
+											} else {
+												var q = new SQLUpdate("l_users", ["u_password='"+hash+"'"], ["u_token='"+token+"'"]);
+												updateDB(conn, q.generate(), function(err) {
+													if (!err) {
+														rsp.end(JSON.stringify({
+															error: false,
+															msg: "Password changed successfully"
+														}));
+													} else {
+														rsp.end(JSON.stringify({
+															error: true,
+															msg: err.error
+														}));
+													}
+													conn.release();
+												});
+											}
+										});
+									}
+								});
+							}
+						});
+					}
+				}
 			});
 		}
 	});
@@ -535,32 +682,42 @@ app.post("/p/register", urlenc, function(req, rsp) {
 				error: true,
 				msg: err.error
 			}));
-			return;
-		}
-		bcrypt.hash(p, salt, function(err, hash) {
-			if (err) {
-				rsp.end(JSON.stringify({
-					error: true,
-					msg: err.error
-				}));
-				return;
-			}
-			var q = new SQLInsert("l_users", [n, hash], ["u_name", "u_password"]);
-			updateDB(q.generate(), function(err) {
-				console.log(err);
-				if (!err) {
+		} else {
+			bcrypt.hash(p, salt, function(err, hash) {
+				if (err) {
 					rsp.end(JSON.stringify({
-						error: false,
-						msg: "User created successfully"
+						error: true,
+						msg: err.error
 					}));
 				} else {
-					rsp.end(JSON.stringify({
-						error:true,
-						msg: err
-					}));
+					getConnection(function(conn, err) {
+						if (err) {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: "An error occurred"
+							}));
+							conn.release();
+						} else {
+							var q = new SQLInsert("l_users", [n, hash], ["u_name", "u_password"]);
+							updateDB(conn, q.generate(), function(err) {
+								if (!err) {
+									rsp.end(JSON.stringify({
+										error: false,
+										msg: "User created successfully"
+									}));
+								} else {
+									rsp.end(JSON.stringify({
+										error:true,
+										msg: err
+									}));
+								}
+								conn.release();
+							});
+						}
+					});
 				}
 			});
-		});
+		}
 	});
 });
 
@@ -578,18 +735,29 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 				cols.push("c_flag");
 				values.push(req.body.c_flag);
 			}
-			var q = new SQLInsert("l_countries", values, cols);
-			updateDB(q.generate(), function(err) {
-				if (!err) {
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "New country created correctly"
-					}));
-				} else {
+			getConnection(function(conn, err) {
+				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						msg: "An error occurred"
 					}));
+					conn.release();
+				} else {
+					var q = new SQLInsert("l_countries", values, cols);
+					updateDB(conn, q.generate(), function(err) {
+						if (!err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								msg: "New country created correctly"
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: err.error
+							}));
+						}
+						conn.release();
+					});
 				}
 			});
 		} else {
@@ -607,17 +775,27 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 			asgs.push("c_flag='"+req.body.c_flag+"'");
 		}
 		var q = new SQLUpdate("l_countries", asgs, ["c_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Country updated successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+			} else {
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Country updated successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	}
@@ -626,18 +804,29 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 app.post("/p/del_country", urlenc, function(req, rsp) {
 	var id = req.body.c_id;
 	if (id !== undefined) {
-		var q = new SQLDelete("l_countries", ["c_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Country deleted successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLDelete("l_countries", ["c_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Country deleted successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	} else {
@@ -666,18 +855,29 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 				cols.push("l_country");
 				values.push(req.body.l_country);
 			}
-			var q = new SQLInsert("l_leagues", values, cols);
-			updateDB(q.generate(), function(err) {
-				if (!err) {
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "New league created correctly"
-					}));
-				} else {
+			getConnection(function(conn, err) {
+				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						msg: "An error occurred"
 					}));
+					conn.release();
+				} else {
+					var q = new SQLInsert("l_leagues", values, cols);
+					updateDB(conn, q.generate(), function(err) {
+						if (!err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								msg: "New league created correctly"
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: err.error
+							}));
+						}
+						conn.release();
+					});
 				}
 			});
 		} else {
@@ -697,18 +897,29 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 		if (req.body.l_country) {
 			asgs.push("l_country="+req.body.l_country);
 		}
-		var q = new SQLUpdate("l_leagues", asgs, ["l_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "League updated successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLUpdate("l_leagues", asgs, ["l_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "League updated successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	}
@@ -717,18 +928,29 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 app.post("/p/del_league", urlenc, function(req, rsp) {
 	var id = req.body.l_id;
 	if (id !== undefined) {
-		var q = new SQLDelete("l_leagues", ["l_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "League deleted successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLDelete("l_leagues", ["l_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "League deleted successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	} else {
@@ -757,18 +979,29 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 				cols.push("s_league");
 				values.push(parseInt(req.body.s_league));
 			}
-			var q = new SQLInsert("l_seasons", values, cols);
-			updateDB(q.generate(), function(err) {
-				if (!err) {
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "New season created correctly"
-					}));
-				} else {
+			getConnection(function(conn, err) {
+				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						msg: "An error occurred"
 					}));
+					conn.release();
+				} else {
+					var q = new SQLInsert("l_seasons", values, cols);
+					updateDB(conn, q.generate(), function(err) {
+						if (!err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								msg: "New season created correctly"
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: err.error
+							}));
+						}
+						conn.release();
+					});
 				}
 			});
 		} else {
@@ -785,18 +1018,29 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 		if (req.body.s_year) {
 			asgs.push("s_year="+req.body.s_year);
 		}
-		var q = new SQLUpdate("l_seasons", asgs, ["s_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Season updated successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLUpdate("l_seasons", asgs, ["s_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Season updated successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	}
@@ -805,18 +1049,29 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 app.post("/p/del_season", urlenc, function(req, rsp) {
 	var id = req.body.s_id;
 	if (id !== undefined) {
-		var q = new SQLDelete("l_seasons", ["s_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Season deleted successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLDelete("l_seasons", ["s_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Season deleted successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	} else {
@@ -853,18 +1108,29 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 				cols.push("t_city");
 				values.push(req.body.t_city);
 			}
-			var q = new SQLInsert("l_teams", values, cols);
-			updateDB(q.generate(), function(err) {
-				if (!err) {
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "New team created correctly"
-					}));
-				} else {
+			getConnection(function(conn, err) {
+				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						msg: "An error occurred"
 					}));
+					conn.release();
+				} else {
+					var q = new SQLInsert("l_teams", values, cols);
+					updateDB(conn, q.generate(), function(err) {
+						if (!err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								msg: "New team created correctly"
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: err.error
+							}));
+						}
+						conn.release();
+					});
 				}
 			});
 		} else {
@@ -885,18 +1151,29 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 			asgs.push("t_stadium='"+req.body.t_stadium+"'");
 		if (req.body.t_city)
 			asgs.push("t_city='"+req.body.t_city+"'");
-		var q = new SQLUpdate("l_teams", asgs, ["t_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Team updated successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLUpdate("l_teams", asgs, ["t_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Team updated successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	}
@@ -905,18 +1182,30 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 app.post("/p/del_team", urlenc, function(req, rsp) {
 	var id = req.body.t_id;
 	if (id !== undefined) {
-		var q = new SQLDelete("l_teams", ["t_id="+id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Team deleted successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+				conn.release();
+				
+			} else {
+				var q = new SQLDelete("l_teams", ["t_id="+id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Team deleted successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	} else {
@@ -932,18 +1221,29 @@ app.post("/p/add_team_season", urlenc, function(req, rsp) {
 		if (req.body.s_id && req.body.t_id) {
 			var values = [req.body.s_id, req.body.t_id];
 			var cols = ["s_id", "t_id"];
-			var q = new SQLInsert("l_team_season", values, cols);
-			updateDB(q.generate(), function(err) {
-				if (!err) {
-					rsp.end(JSON.stringify({
-						error: false,
-						msg: "Team was signed up correctly"
-					}));
-				} else {
+			getConnection(function(conn, err) {
+				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						msg: "An error occurred"
 					}));
+					conn.release();
+				} else {
+					var q = new SQLInsert("l_team_season", values, cols);
+					updateDB(conn, q.generate(), function(err) {
+						if (!err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								msg: "Team was signed up correctly"
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: true,
+								msg: err.error
+							}));
+						}
+						conn.release();
+					});
 				}
 			});
 		} else {
@@ -962,18 +1262,29 @@ app.post("/p/add_team_season", urlenc, function(req, rsp) {
 
 app.post("/p/del_team_season", urlenc, function(req, rsp) {
 	if (req.body.t_id && req.body.s_id) {
-		var q = new SQLDelete("l_team_season", ["t_id="+req.body.t_id, "s_id="+req.body.s_id]);
-		updateDB(q.generate(), function(err) {
-			if (!err) {
-				rsp.end(JSON.stringify({
-					error: false,
-					msg: "Team signed out successfully"
-				}));
-			} else {
+		getConnection(function(conn, err) {
+			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err.error
+					msg: "An error occurred"
 				}));
+				conn.release();
+			} else {
+				var q = new SQLDelete("l_team_season", ["t_id="+req.body.t_id, "s_id="+req.body.s_id]);
+				updateDB(conn, q.generate(), function(err) {
+					if (!err) {
+						rsp.end(JSON.stringify({
+							error: false,
+							msg: "Team signed out successfully"
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: err.error
+						}));
+					}
+					conn.release();
+				});
 			}
 		});
 	} else {

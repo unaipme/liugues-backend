@@ -168,7 +168,7 @@ app.get("/g/countries", function(req, rsp) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: false,
-				data: rows
+				data: err
 			}));
 		} else {
 			getDataFromDB(conn, q.generate(), function(rows, err) {
@@ -183,9 +183,9 @@ app.get("/g/countries", function(req, rsp) {
 						data: rows
 					}));
 				}
+				conn.release();
 			});
 		}
-		conn.release();
 	});
 });
 
@@ -216,9 +216,9 @@ app.get("/g/leagues", function(req, rsp) {
 						data: rows
 					}));
 				}
+				conn.release();
 			});
 		}
-		conn.release();
 	});
 });
 
@@ -240,6 +240,7 @@ app.get("/g/teams", function(req, rsp) {
 								error: true,
 								data: err
 							}));
+							conn.release();
 						} else {
 							var q2 = new SQLSelect("l_teams", "t_id="+req.query.t_id);
 							getDataFromDB(conn, q2.generate(), function(rows2, err2) {
@@ -256,11 +257,11 @@ app.get("/g/teams", function(req, rsp) {
 										data: r
 									}));
 								}
+								conn.release();
 							});
 						}
 					});
 				}
-				conn.release();
 			});
 		}
 	} else {
@@ -284,9 +285,9 @@ app.get("/g/teams", function(req, rsp) {
 							data: rows
 						}));
 					}
+					conn.release();
 				});
 			}
-			conn.release();
 		});
 	}
 });
@@ -321,9 +322,9 @@ app.get("/g/users", function(req, rsp) {
 						data: rows
 					}));
 				}
+				conn.release();
 			});
 		}
-		conn.release();
 	});
 });
 
@@ -361,9 +362,9 @@ app.get("/g/seasons", function(req, rsp) {
 						data: rows
 					}));
 				}
+				conn.release();
 			});
 		}
-		conn.release();
 	});
 });
 

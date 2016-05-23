@@ -146,7 +146,6 @@ function getDataFromDB(conn, q, cb) {
 
 function updateDB(conn, q, cb) {
 	conn.query(q, function(err) {
-		if (err) throw err;
 		cb(err);
 	});
 }
@@ -1647,7 +1646,7 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: "An error occurred when fetching the data"
+							data: "Something happened when updating the database. Is any of the teams already in a game of this round?"
 						}));
 						conn.release();
 					} else {
@@ -1701,7 +1700,7 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 						if (err) {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: "An error occurred when fetching the data"
+								data: "Something happened when updating the database. Is any of the teams already in a game of this round?"
 							}));
 							conn.release();
 						} else {

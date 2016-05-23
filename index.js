@@ -1541,7 +1541,7 @@ app.post("/p/ch_round", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err
+					data: "An error occurred when approaching the database"
 				}));
 			} else {
 				var q = new SQLUpdate("l_rounds", assigns, ["r_id="+req.body.r_id]);
@@ -1549,15 +1549,25 @@ app.post("/p/ch_round", urlenc, function(req, rsp) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err
+							data: "Could not update data"
 						}));
+						conn.release();
 					} else {
-						rsp.end(JSON.stringify({
-							error: false,
-							msg: "Round data updated succesfully"
-						}));
+						var q = new SQLSelect("v_rounds");
+						getDataFromDB(conn, q.generate(), function(rows, err) {
+							if (err) {
+								rsp.end(JSON.stringify({
+									error: false
+								}));
+							} else {
+								rsp.end(JSON.stringify({
+									error: false,
+									data: rows
+								}));
+							}
+							conn.release();
+						});
 					}
-					conn.release();
 				});
 			}
 		});
@@ -1585,13 +1595,23 @@ app.post("/p/del_round", urlenc, function(req, rsp) {
 							error: true,
 							msg: err
 						}));
+						conn.release();
 					} else {
-						rsp.end(JSON.stringify({
-							error: false,
-							msg: "Round deleted succesfully"
-						}));
+						var q = new SQLSelect("v_rounds");
+						getDataFromDB(conn, q.generate(), function(rows, err) {
+							if (err) {
+								rsp.end(JSON.stringify({
+									error: false
+								}));
+							} else {
+								rsp.end(JSON.stringify({
+									error: false,
+									data: rows
+								}));
+							}
+							conn.release();
+						});
 					}
-					conn.release();
 				});
 			}
 		});
@@ -1629,13 +1649,23 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 							error: true,
 							data: "An error occurred when fetching the data"
 						}));
+						conn.release();
 					} else {
-						rsp.end(JSON.stringify({
-							error: false,
-							data: "The data was updated successfully"
-						}));
+						var q = new SQLSelect("v_games");
+						getDataFromDB(conn, q.generate(), function(rows, err) {
+							if (err) {
+								rsp.end(JSON.stringify({
+									error: false
+								}));
+							} else {
+								rsp.end(JSON.stringify({
+									error: false,
+									data: rows
+								}));
+							}
+							conn.release();
+						});
 					}
-					conn.release();
 				});
 			}
 			
@@ -1673,13 +1703,23 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 								error: true,
 								data: "An error occurred when fetching the data"
 							}));
+							conn.release();
 						} else {
-							rsp.end(JSON.stringify({
-								error: false,
-								data: "The game was created successfully"
-							}));
+							var q = new SQLSelect("v_games");
+							getDataFromDB(conn, q.generate(), function(rows, err) {
+								if (err) {
+									rsp.end(JSON.stringify({
+										error: false
+									}));
+								} else {
+									rsp.end(JSON.stringify({
+										error: false,
+										data: rows
+									}));
+								}
+								conn.release();
+							});
 						}
-						conn.release();
 					});
 				}
 			});

@@ -595,6 +595,53 @@ app.get("/g/init", function(req, rsp) {
 	});
 });
 
+app.get("/g/next_games", function(req, rsp) {
+	var rq = new SQLSelect("v_next_rounds");
+	var gq = new SQLSelect("v_next_games");
+	getConnection(function(conn, err) {
+		if (err) {
+			rsp.end(JSON.stringify({
+				error: true,
+				data: "An error occurred when approaching the database"
+			}));
+			return;
+		}
+		getDataFromDB(conn, rq.generate(), function(rounds, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when fetching the data"
+				}));
+				conn.release();
+				return;
+			}
+			getDataFromDB(conn, gq.generate(), function(games, err) {
+				conn.release();
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when fetching the data"
+					}));
+					return;
+				}
+				var data = [];
+				for (var i=0; i<rounds.length; i++) {
+					var r = rounds[i];
+					var gl = games.filter(function(e) {
+						return (e.g_round == r.r_id);
+					});
+					r.games = gl;
+					data.push(r);
+				}
+				rsp.end(JSON.stringify({
+					error: false,
+					data: data
+				}));
+			});
+		});
+	})
+});
+
 //POST request routing
 
 app.post("/p/login", urlenc, function(req, rsp) {

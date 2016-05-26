@@ -538,7 +538,7 @@ app.get("/g/init", function(req, rsp) {
 										}));
 										return;
 									}
-									var q = new SQLSelect("l_players");
+									var q = new SQLSelect("v_players");
 									getDataFromDB(conn, q.generate(), function(players, err) {
 										if (err) {
 											rsp.end(JSON.stringify({
@@ -1890,7 +1890,7 @@ app.post("/p/ch_player", urlenc, function(req, rsp) {
 					}));
 					return;
 				}
-				var q = new SQLSelect("l_players");
+				var q = new SQLSelect("v_players");
 				getDataFromDB(conn, q.generate(), function(rows, err) {
 					conn.release();
 					if (err) {
@@ -1941,7 +1941,7 @@ app.post("/p/ch_player", urlenc, function(req, rsp) {
 					}));
 					return;
 				}
-				var q = new SQLSelect("l_players");
+				var q = new SQLSelect("v_players");
 				getDataFromDB(conn, q.generate(), function(rows, err) {
 					conn.release();
 					if (err) {
@@ -1980,7 +1980,7 @@ app.post("/p/del_player", urlenc, function(req, rsp) {
 					conn.release();
 					return;
 				}
-				var q = new SQLSelect("l_players");
+				var q = new SQLSelect("v_players");
 				getDataFromDB(conn, q.generate(), function(rows, err) {
 					conn.release();
 					if (err) {

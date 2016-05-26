@@ -2079,7 +2079,7 @@ app.post("/p/del_career", urlenc, function(req, rsp) {
 					conn.release();
 					return;
 				}
-				var q = new SQLSelect("l_player_season");
+				var q = new SQLSelect("l_player_season", ["p_id="+req.body.p_id]);
 				getDataFromDB(conn, q.generate(), function(rows, err) {
 					conn.release();
 					if (err) {

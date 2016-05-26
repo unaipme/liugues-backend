@@ -236,7 +236,7 @@ app.get("/g/teams", function(req, rsp) {
 						data: "An error happened when trying to reach the database"
 					}));
 				} else {
-					var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, "s.*");
+					var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, ["s.*"]);
 					getDataFromDB(conn, q1.generate(), function(rows, err) {
 						if (err) {
 							rsp.end(JSON.stringify({
@@ -352,7 +352,7 @@ app.get("/g/seasons", function(req, rsp) {
 				data: "An error happened when trying to reach the database"
 			}));
 		} else {
-			var q = new SQLSelect("l_seasons s, l_leagues l", params, "s.*, l.l_country");
+			var q = new SQLSelect("l_seasons s, l_leagues l", params, ["s.*, l.l_country"]);
 			getDataFromDB(conn, q.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
@@ -360,7 +360,7 @@ app.get("/g/seasons", function(req, rsp) {
 						data: err
 					}));
 				} else {
-					var q2 = new SQLSelect("l_teams t, l_team_season ts", ["ts.t_id=t.t_id"], "t.*, ts.s_id");
+					var q2 = new SQLSelect("l_teams t, l_team_season ts", ["ts.t_id=t.t_id"], ["t.*, ts.s_id"]);
 					getDataFromDB(conn, q2.generate(), function(rows2, err2) {
 						if (err2) {
 							rsp.end(JSON.stringify({
@@ -484,7 +484,7 @@ app.get("/g/init", function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err
+						data: "An error occurred when fetching the data from the database"
 					}));
 					conn.release();
 					return;
@@ -494,7 +494,7 @@ app.get("/g/init", function(req, rsp) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err
+							data: "An error occurred when fetching the data from the database"
 						}));
 						conn.release();
 						return;
@@ -504,7 +504,7 @@ app.get("/g/init", function(req, rsp) {
 						if (err) {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err
+								data: "An error occurred when fetching the data from the database"
 							}));
 							conn.release();
 							return;
@@ -514,7 +514,7 @@ app.get("/g/init", function(req, rsp) {
 							if (err) {
 								rsp.end(JSON.stringify({
 									error: true,
-									data: err
+									data: "An error occurred when fetching the data from the database"
 								}));
 								conn.release();
 								return;
@@ -524,7 +524,7 @@ app.get("/g/init", function(req, rsp) {
 								if (err) {
 									rsp.end(JSON.stringify({
 										error: true,
-										data: err
+										data: "An error occurred when fetching the data from the database"
 									}));
 									conn.release();
 									return;
@@ -534,57 +534,68 @@ app.get("/g/init", function(req, rsp) {
 									if (err) {
 										rsp.end(JSON.stringify({
 											error: true,
-											data: err
+											data: "An error occurred when fetching the data from the database"
 										}));
-									} else {
-										for (var i=0; i<ts.length; i++) {
-											var e = ts[i];
-											var ti, si, j;
-											for (j=0; j<teams.length; j++) {
-												if (teams[j].t_id === e.t_id) {
-													ti = j;
-													break;
-												}
-											}
-											for (j=0; j<seasons.length; j++) {
-												if (seasons[j].s_id === e.s_id) {
-													si = j;
-													break;
-												}
-											}
-											var s = seasons[si];
-											var t = teams[ti];
-											if (!t.seasons) t.seasons = [];
-											if (!s.teams) s.teams = [];
-											t.seasons.push({
-												s_id: s.s_id,
-												s_league: s.s_league,
-												s_desc: s.s_desc,
-												s_year: s.s_year
-											});
-											seasons[si].teams.push({
-												t_id: t.t_id,
-												t_country: t.t_country,
-												t_name: t.t_name,
-												t_city: t.t_city,
-												t_stadium: t.t_stadium,
-												t_crest: t.t_crest
-											});
-										}
-										var data = {
-												rounds: rounds,
-												countries: countries,
-												leagues: leagues,
-												teams: teams,
-												games: games,
-												seasons: seasons
-										};
-										rsp.end(JSON.stringify({
-											error: false,
-											data: data
-										}));
+										return;
 									}
-									conn.release();
+									var q = new SQLSelect("l_players");
+									getDataFromDB(conn, q.generate(), function(players, err) {
+										if (err) {
+											rsp.end(JSON.stringify({
+												error: true,
+												data: "An error occurred when fetching the data from the database"
+											}));
+										} else {
+											for (var j=0; j<teams.length; j++) teams[j].seasons = [];
+											for (var k=0; k<seasons.length; k++) seasons[k].teams = [];
+											for (var i=0; i<ts.length; i++) {
+												var e = ts[i];
+												var ti, si, j;
+												for (j=0; j<teams.length; j++) {
+													if (teams[j].t_id === e.t_id) {
+														ti = j;
+														break;
+													}
+												}
+												for (j=0; j<seasons.length; j++) {
+													if (seasons[j].s_id === e.s_id) {
+														si = j;
+														break;
+													}
+												}
+												var s = seasons[si];
+												var t = teams[ti];
+												t.seasons.push({
+													s_id: s.s_id,
+													s_league: s.s_league,
+													s_desc: s.s_desc,
+													s_year: s.s_year
+												});
+												seasons[si].teams.push({
+													t_id: t.t_id,
+													t_country: t.t_country,
+													t_name: t.t_name,
+													t_city: t.t_city,
+													t_stadium: t.t_stadium,
+													t_crest: t.t_crest
+												});
+											}
+											var data = {
+													rounds: rounds,
+													countries: countries,
+													leagues: leagues,
+													teams: teams,
+													games: games,
+													seasons: seasons,
+													players: players
+											};
+											rsp.end(JSON.stringify({
+												error: false,
+												data: data
+											}));
+										}
+										conn.release();
+									});
 								});
 							});
 						});
@@ -640,6 +651,40 @@ app.get("/g/next_games", function(req, rsp) {
 			});
 		});
 	})
+});
+
+app.get("/g/career", function(req, rsp) {
+	if (req.query.p_id) {
+		var q = new SQLSelect("l_player_season", ["p_id="+req.query.p_id]);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			getDataFromDB(conn, q.generate(), function(rows, err) {
+				conn.release();
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when fetching data from the database"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rows
+					}));
+				}
+			});
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			data: "Player's ID is required"
+		}));
+	}	
 });
 
 //POST request routing
@@ -1809,6 +1854,251 @@ app.post("/p/del_game", urlenc, function(req, rsp) {
 		rsp.end(JSON.stringify({
 			error: true,
 			data: "The ID of the game is required"
+		}));
+	}
+});
+
+app.post("/p/ch_player", urlenc, function(req, rsp) {
+	if (req.body.p_id) {
+		var as = [];
+		if (req.body.p_name) {
+			as.push("p_name='"+req.body.p_name+"'");
+		}
+		if (req.body.p_sname) {
+			as.push("p_sname='"+req.body.p_sname+"'");
+		}
+		if (req.body.p_country) {
+			as.push("p_country="+req.body.p_country);
+		}
+		if (req.body.p_position) {
+			as.push("p_position="+req.body.p_position);
+		}
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			var q = new SQLUpdate("l_players", as, ["p_id="+req.body.p_id]);
+			updateDB(conn, q.generate(), function(err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when updating the data"
+					}));
+					return;
+				}
+				var q = new SQLSelect("l_players");
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					conn.release();
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: false,
+							data: rows
+						}));
+					}
+				})
+			});
+		});
+	} else {
+		var vals = [], cols = [];
+		if (req.body.p_name) {
+			vals.push(req.body.p_name);
+			cols.push("p_name");
+		}
+		if (req.body.p_sname) {
+			vals.push(req.body.p_sname);
+			cols.push("p_sname");
+		}
+		if (req.body.p_country) {
+			vals.push(req.body.p_country);
+			cols.push("p_country");
+		}
+		if (req.body.p_position) {
+			vals.push(req.body.p_position);
+			cols.push("p_position");
+		}
+		var q = new SQLInsert("l_players", vals, cols);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error happened when approaching the database"
+				}));
+				return;
+			}
+			updateDB(conn, q.generate(), function(err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error happened when creating the player"
+					}));
+					return;
+				}
+				var q = new SQLSelect("l_players");
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					conn.release();
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: false,
+							data: rows
+						}));
+					}
+				})
+			})
+		});
+	}
+});
+
+app.post("/p/del_player", urlenc, function(req, rsp) {
+	if (req.body.p_id) {
+		var q = new SQLDelete("l_players", ["p_id="+req.body.p_id]);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			updateDB(conn, q.generate(), function(err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when trying to delete the player"
+					}));
+					conn.release();
+					return;
+				}
+				var q = new SQLSelect("l_players");
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					conn.release();
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: false,
+							data: rows
+						}));
+					}
+				});
+			});
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			data: "A player's ID is required"
+		}));
+	}
+});
+
+app.post("/p/ch_career", urlenc, function(req, rsp) {
+	if (req.body.p_id && req.body.t_id && req.body.s_id) {
+		var values = [], cols = [];
+		values.push(req.body.p_id);
+		cols.push("p_id");
+		values.push(req.body.s_id);
+		cols.push("s_id");
+		values.push(req.body.t_id);
+		cols.push("t_id");
+		var q = new SQLInsert("l_player_season", values, cols);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			updateDB(conn, q.generate(), function(err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when signing up"
+					}));
+					conn.release();
+					return;
+				}
+				var q = new SQLSelect("l_player_season", ["p_id="+req.body.p_id]);
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					conn.release();
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: false,
+							data: rows
+						}));
+					}
+				})
+			});
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			data: "More parameters are needed"
+		}));
+	}
+});
+
+app.post("/p/del_career", urlenc, function(req, rsp) {
+	if (req.body.p_id && req.body.s_id && req.body.t_id) {
+		var w = [];
+		w.push("p_id="+req.body.p_id);
+		w.push("s_id="+req.body.s_id);
+		w.push("t_id="+req.body.t_id);
+		var q = new SQLDelete("l_player_season", w);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when approaching the database"
+				}));
+				return
+			}
+			updateDB(conn, q.generate(), function(err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when trying to delete the data"
+					}));
+					conn.release();
+					return;
+				}
+				var q = new SQLSelect("l_player_season");
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					conn.release();
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+					} else {
+						rsp.end(JSON.stringify({
+							error: false,
+							data: rows
+						}));
+					}
+				});
+			});
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			data: "More parameters are needed"
 		}));
 	}
 });

@@ -2063,17 +2063,28 @@ app.post("/p/ch_career", urlenc, function(req, rsp) {
 				}
 				var q = new SQLSelect("l_player_season", ["p_id="+req.body.p_id]);
 				getDataFromDB(conn, q.generate(), function(rows, err) {
-					conn.release();
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: false
 						}));
-					} else {
-						rsp.end(JSON.stringify({
-							error: false,
-							data: rows
-						}));
-					}
+						conn.release();
+						return;
+					} 
+					var q = new SQLSelect("v_players");
+					getDataFromDB(conn, q.generate(), function(pls, err) {
+						conn.release();
+						if (err) {
+							rsp.end(JSON.stringify({
+								error: false,
+								data: {career: rows}
+							}));
+						} else {
+							rsp.end(JSON.stringify({
+								error: false,
+								data: {career: rows, players: pls}
+							}));
+						}
+					});
 				})
 			});
 		});

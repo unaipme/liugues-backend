@@ -235,36 +235,66 @@ app.get("/g/teams", function(req, rsp) {
 						error: true,
 						data: "An error happened when trying to reach the database"
 					}));
-				} else {
-					var q1 = new SQLSelect("l_team_season ts, l_seasons s", "s.s_id=ts.s_id AND ts.t_id="+req.query.t_id, ["s.*"]);
-					getDataFromDB(conn, q1.generate(), function(rows, err) {
-						if (err) {
+					return;
+				} 
+				var q1 = new SQLSelect("l_team_season ts, l_seasons s", ["s.s_id=ts.s_id", "ts.t_id="+req.query.t_id], ["s.*"]);
+				getDataFromDB(conn, q1.generate(), function(seasons, err) {
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: true,
+							data: "An error happened when fetching the data from the database"
+						}));
+						conn.release();
+						return
+					}
+					var q2 = new SQLSelect("l_teams", ["t_id="+req.query.t_id]);
+					getDataFromDB(conn, q2.generate(), function(team, err2) {
+						if (err2) {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err
+								data: "An error happened when fetching the data from the database"
 							}));
 							conn.release();
-						} else {
-							var q2 = new SQLSelect("l_teams", "t_id="+req.query.t_id);
-							getDataFromDB(conn, q2.generate(), function(rows2, err2) {
-								if (err2) {
+							return;
+						}
+						var r = team[0];
+						if (!r) {
+							rsp.end(JSON.stringify({
+								error: true,
+								data: "No team was found with that ID"
+							}));
+							return;
+						}
+						var q3 = new SQLSelect("v_games", [req.query.t_id+" IN (g_hometeam_id, g_awayteam_id)", "g_when < NOW()"]);
+						getDataFromDB(conn, q3.generate(), function(games, err) {
+							if (err) {
+								rsp.end(JSON.stringify({
+									error: true,
+									data: "An error happened when fetching the data from the database"
+								}));
+								return;
+							}
+							var q4 = new SQLSelect("v_squad", ["t_id="+req.query.t_id, "s_year=DATE_FORMAT(NOW(), '%Y')"]);
+							getDataFromDB(conn, q4.generate(), function(squad, err) {
+								conn.release();
+								if (err) {
 									rsp.end(JSON.stringify({
 										error: true,
-										data: err2
+										data: "An error happened when fetching the data from the database"
 									}));
 								} else {
-									var r = rows2[0];
-									r.seasons = rows;
+									r.seasons = seasons;
+									r.squad = squad;
+									r.last_games = games;
 									rsp.end(JSON.stringify({
 										error: false,
 										data: r
 									}));
 								}
-								conn.release();
 							});
-						}
+						});
 					});
-				}
+				});
 			});
 		}
 	} else {

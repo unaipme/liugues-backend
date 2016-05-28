@@ -58,7 +58,7 @@ function SQLInsert(table, values, cols) {
 			q += "(";
 			for (var b=0; b<this.values[a].length; b++) {
 				if (typeof this.values[a][b] === "string") {
-					if (this.values[a][b].endsWith("f")) q += this.values[a][b].substr(0, this.values[a][b].length - 1);
+					if (this.values[a][b].endsWith("_f")) q += this.values[a][b].substr(0, this.values[a][b].length - 2);
 					else q += "'"+this.values[a][b]+"'";
 				}
 				else q += this.values[a][b];
@@ -1622,7 +1622,7 @@ app.post("/p/fc", urlenc, function(req, rsp) {
 					var queries = [];
 					for (var i=1; i<=last; i++) {
 						var cols = ["r_season", "r_desc", "r_number", "r_week"];
-						var values = [s_id, s_desc + ", round " + i, i, "DATE_FORMAT('"+parseDate(date)+"', '%Y-%m-%d')f"];
+						var values = [s_id, s_desc + ", round " + i, i, "DATE_FORMAT('"+parseDate(date)+"', '%Y-%m-%d')_f"];
 						var q = new SQLInsert("l_rounds", values, cols);
 						queries.push(q.generate());
 						date.setDate(date.getDate() + 7);
@@ -1803,7 +1803,7 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 				cols.push("g_awayteam");
 			}
 			if (req.body.g_when) {
-				values.push("DATE_FORMAT('"+req.body.g_when+"', '%Y-%m-%d %H:%i')f");
+				values.push("DATE_FORMAT('"+req.body.g_when+"', '%Y-%m-%d %H:%i')_f");
 				cols.push("g_when");
 			}
 			if (req.body.g_round) {

@@ -265,7 +265,7 @@ app.get("/g/teams", function(req, rsp) {
 							}));
 							return;
 						}
-						var q3 = new SQLSelect("v_games", [req.query.t_id+" IN (g_hometeam_id, g_awayteam_id)", "g_when < NOW()"]);
+						var q3 = new SQLSelect("v_games", [req.query.t_id+" IN (g_hometeam_id, g_awayteam_id)", "g_when < NOW() LIMIT 0, 5"]);
 						getDataFromDB(conn, q3.generate(), function(games, err) {
 							if (err) {
 								rsp.end(JSON.stringify({

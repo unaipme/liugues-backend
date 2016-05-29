@@ -1849,18 +1849,33 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 						conn.release();
 					} else {
 						var q = new SQLSelect("v_games");
-						getDataFromDB(conn, q.generate(), function(rows, err) {
+						getDataFromDB(conn, q.generate(), function(games, err) {
 							if (err) {
 								rsp.end(JSON.stringify({
 									error: false
 								}));
-							} else {
-								rsp.end(JSON.stringify({
-									error: false,
-									data: rows
-								}));
+								conn.release();
+								return;
 							}
-							conn.release();
+							var q = new SQLSelect("v_events");
+							getDataFromDB(conn, q.generate(), function(ev, err) {
+								conn.release();
+								if (err) {
+									rsp.end(JSON.stringify({
+										error: false
+									}));
+								} else {
+									for (var i=0; i<games.length; i++) {
+										games[i].events = ev.filter(function(e) {
+											return (e.e_game === games[i].g_id);
+										});
+									}
+									rsp.end(JSON.stringify({
+										error: false,
+										data: games
+									}));
+								}
+							});
 						});
 					}
 				});
@@ -2268,7 +2283,7 @@ app.post("/p/ch_goal", urlenc, function(req, rsp) {
 				conn.release();
 				return;
 			}
-			var q = new SQLSelect("v_games", ["g_id="+req.body.g_game]);
+			var q = new SQLSelect("v_games");
 			getDataFromDB(conn, q.generate(), function(games, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
@@ -2277,7 +2292,7 @@ app.post("/p/ch_goal", urlenc, function(req, rsp) {
 					conn.release();
 					return;
 				}
-				var q = new SQLSelect("v_events", ["e_game="+req.body.g_game]);
+				var q = new SQLSelect("v_events");
 				getDataFromDB(conn, q.generate(), function(ev, err) {
 					conn.release();
 					if (err) {
@@ -2322,7 +2337,7 @@ app.post("/p/del_goal", urlenc, function(req, rsp) {
 					conn.release();
 					return;
 				}
-				var q = new SQLSelect("v_games", ["g_id="+req.body.g_game]);
+				var q = new SQLSelect("v_games");
 				getDataFromDB(conn, q.generate(), function(games, err) {
 					if (err) {
 						rsp.end(JSON.stringify({
@@ -2331,7 +2346,7 @@ app.post("/p/del_goal", urlenc, function(req, rsp) {
 						conn.release();
 						return;
 					}
-					var q = new SQLSelect("v_events", ["e_game="+req.body.g_game]);
+					var q = new SQLSelect("v_events");
 					getDataFromDB(conn, q.generate(), function(ev, err) {
 						conn.release();
 						if (err) {

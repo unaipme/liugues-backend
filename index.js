@@ -2376,6 +2376,139 @@ app.post("/p/del_goal", urlenc, function(req, rsp) {
 	}
 });
 
+app.post("/p/ch_card", urlenc, function(req, rsp) {
+	var vals = [], cols = [];
+	if (req.body.c_player) {
+		vals.push(req.body.c_player);
+		cols.push("c_player");
+	}
+	if (req.body.c_game) {
+		vals.push(req.body.c_game);
+		cols.push("c_game");
+	}
+	if (req.body.c_minute) {
+		vals.push(req.body.c_minute);
+		cols.push("c_minute");
+	}
+	if (req.body.c_team) {
+		vals.push(req.body.c_team);
+		cols.push("c_team");
+	}
+	if (req.body.c_type) {
+		vals.push(req.body.c_type);
+		cols.push("c_type");
+	}
+	var q = new SQLInsert("l_cards", vals, cols);
+	getConnection(function(conn, err) {
+		if (err) {
+			rsp.end(JSON.stringify({
+				error: true,
+				data: "An error occurred when approaching the database"
+			}));
+			return;
+		}
+		updateDB(conn, q.generate(), function(err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when trying to add the information to the database"
+				}));
+				conn.release();
+				return;
+			}
+			var q = new SQLSelect("v_games");
+			getDataFromDB(conn, q.generate(), function(games, err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: false
+					}));
+					conn.release();
+					return;
+				}
+				var q = new SQLSelect("v_events");
+				getDataFromDB(conn, q.generate(), function(ev, err) {
+					conn.release();
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+					} else {
+						for (var i=0; i<games.length; i++) {
+							games[i].events = ev.filter(function(e) {
+								return (e.e_game === games[i].g_id);
+							});
+						}
+						rsp.end(JSON.stringify({
+							error: false,
+							data: games
+						}));
+					}
+				});
+			});
+		});
+	});
+});
+
+app.post("/p/del_card", urlenc, function(req, rsp) {
+	if (req.body.c_id && req.body.c_game) {
+		var id = req.body.c_id;
+		var q = new SQLDelete("l_cards", ["c_id="+id]);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			updateDB(conn, q.generate(), function(err) {
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						msg: "An error occurred when deleting the goal from the database"
+					}));
+					conn.release();
+					return;
+				}
+				var q = new SQLSelect("v_games");
+				getDataFromDB(conn, q.generate(), function(games, err) {
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: false
+						}));
+						conn.release();
+						return;
+					}
+					var q = new SQLSelect("v_events");
+					getDataFromDB(conn, q.generate(), function(ev, err) {
+						conn.release();
+						if (err) {
+							rsp.end(JSON.stringify({
+								error: false
+							}));
+						} else {
+							for (var i=0; i<games.length; i++) {
+								games[i].events = ev.filter(function(e) {
+									return (e.e_game === games[i].g_id);
+								});
+							}
+							rsp.end(JSON.stringify({
+								error: false,
+								data: games
+							}));
+						}
+					});
+				});
+			});
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			data: "The IDs of the card and the game are required"
+		}));
+	}
+});
+
 app.listen(process.env.PORT || 5000, function() {
 	console.log("Listening to port 5000");
 });

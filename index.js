@@ -883,6 +883,40 @@ app.get("/g/last_games", function(req, rsp) {
 	});
 });
 
+app.get("/g/ranking", function(req, rsp) {
+	if (req.query.s_id) {
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			var q = new SQLSelect("v_ranking", ["r_season_id="+req.query.s_id]);
+			getDataFromDB(conn, q.generate(), function(rank, err) {
+				conn.release();
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when approaching the database"
+					}));
+				} else {
+					rsp.end(JSON.stringify({
+						error: false,
+						data: rank
+					}));
+				}
+			});
+		});
+	} else {
+		rsp.end(JSON.stringify({
+			error: true,
+			data: "Season ID is required"
+		}));
+	}
+});
+
 //POST request routing
 
 app.post("/p/login", urlenc, function(req, rsp) {

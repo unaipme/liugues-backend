@@ -471,24 +471,18 @@ app.get("/g/rounds", function(req, rsp) {
 });
 
 app.get("/g/games", function(req, rsp) {
-	var params = [];
-	if (Object.size(req.query) >= 1) {
-		if (req.query.g_round) {
-			params.push("g_round="+req.query.g_round);
-		}
-		if (req.query.g_team) {
-			params.push(g_team+" IN (g_hometeam_id, g_awayteam_id)")
-		}
-	}
-	var q = new SQLSelect("v_games", params);
-	getConnection(function(conn, err) {
-		if (err) {
-			rsp.end(JSON.stringify({
-				error: true,
-				msg: "Could not reach database"
-			}));
-		} else {
-			getDataFromDB(conn, q.generate(), function(rows, err) {
+	if (req.query.g_id) {
+		var ev = new SQLSelect("v_events", ["e_game="+req.query.g_id]);
+		var gg = new SQLSelect("v_games", ["g_id="+req.query.g_id]);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: "An error occurred when approaching the database"
+				}));
+				return;
+			}
+			getDataFromDB(conn, gg.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
@@ -497,34 +491,86 @@ app.get("/g/games", function(req, rsp) {
 					conn.release();
 					return;
 				}
-				var ids = [];
-				for (var i=0; i<rows.length; i++) {
-					ids.push(rows[i].g_id);
+				if (rows.length === 0) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "There is no game with the given ID"
+					}));
+					return;
 				}
-				var q2 = new SQLSelect("v_events", ["e_game IN ("+ids.join(",")+")"]);
-				getDataFromDB(conn, q2.generate(), function(ev, err) {
+				getDataFromDB(conn, ev.generate(), function(ev, err) {
 					conn.release();
 					if (err) {
 						rsp.end(JSON.stringify({
-							err: false,
-							data: rows
+							error: true,
+							data: "An error occurred when fetching data"
 						}));
 					} else {
-						for (var i=0; i<rows.length; i++) {
-							var l = ev.filter(function(e) {
-								return (e.e_game == rows[i].g_id);
-							});
-							rows[i].events = l;
-						}
+						rows[0].events = ev;
 						rsp.end(JSON.stringify({
-							err: false,
-							data: rows
+							error: false,
+							data: rows[0]
 						}));
 					}
 				});
 			});
+		});
+	} else {
+		var params = [];
+		if (Object.size(req.query) >= 1) {
+			if (req.query.g_round) {
+				params.push("g_round="+req.query.g_round);
+			}
+			if (req.query.g_team) {
+				params.push(g_team+" IN (g_hometeam_id, g_awayteam_id)")
+			}
 		}
-	});
+		var q = new SQLSelect("v_games", params);
+		getConnection(function(conn, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					msg: "Could not reach database"
+				}));
+			} else {
+				getDataFromDB(conn, q.generate(), function(rows, err) {
+					if (err) {
+						rsp.end(JSON.stringify({
+							error: true,
+							msg: "An error occurred when fetching data"
+						}));
+						conn.release();
+						return;
+					}
+					var ids = [];
+					for (var i=0; i<rows.length; i++) {
+						ids.push(rows[i].g_id);
+					}
+					var q2 = new SQLSelect("v_events", ["e_game IN ("+ids.join(",")+")"]);
+					getDataFromDB(conn, q2.generate(), function(ev, err) {
+						conn.release();
+						if (err) {
+							rsp.end(JSON.stringify({
+								err: false,
+								data: rows
+							}));
+						} else {
+							for (var i=0; i<rows.length; i++) {
+								var l = ev.filter(function(e) {
+									return (e.e_game == rows[i].g_id);
+								});
+								rows[i].events = l;
+							}
+							rsp.end(JSON.stringify({
+								err: false,
+								data: rows
+							}));
+						}
+					});
+				});
+			}
+		});
+	}
 });
 
 app.get("/g/init", function(req, rsp) {
@@ -753,7 +799,7 @@ app.get("/g/next_games", function(req, rsp) {
 				}));
 			});
 		});
-	})
+	});
 });
 
 app.get("/g/career", function(req, rsp) {
@@ -788,6 +834,53 @@ app.get("/g/career", function(req, rsp) {
 			data: "Player's ID is required"
 		}));
 	}	
+});
+
+app.get("/g/last_games", function(req, rsp) {
+	var rq = new SQLSelect("v_last_rounds");
+	var gq = new SQLSelect("v_last_games");
+	getConnection(function(conn, err) {
+		if (err) {
+			rsp.end(JSON.stringify({
+				error: true,
+				data: "An error occurred when approaching the database"
+			}));
+			return;
+		}
+		getDataFromDB(conn, rq.generate(), function(rounds, err) {
+			if (err) {
+				rsp.end(JSON.stringify({
+					error: true,
+					data: "An error occurred when fetching the data"
+				}));
+				conn.release();
+				return;
+			}
+			getDataFromDB(conn, gq.generate(), function(games, err) {
+				conn.release();
+				if (err) {
+					rsp.end(JSON.stringify({
+						error: true,
+						data: "An error occurred when fetching the data"
+					}));
+					return;
+				}
+				var data = [];
+				for (var i=0; i<rounds.length; i++) {
+					var r = rounds[i];
+					var gl = games.filter(function(e) {
+						return (e.g_round == r.r_id);
+					});
+					r.games = gl;
+					data.push(r);
+				}
+				rsp.end(JSON.stringify({
+					error: false,
+					data: data
+				}));
+			});
+		});
+	});
 });
 
 //POST request routing

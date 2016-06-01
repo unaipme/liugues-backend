@@ -98,6 +98,8 @@ function SQLDelete(table, where) {
 }
 
 //Function definitions and implementations
+
+//Function to get the length of an object, mainly for the request parameters
 Object.size = function(obj) {
 	var size = 0, key;
 	for (key in obj) {
@@ -106,6 +108,7 @@ Object.size = function(obj) {
 	return size;
 };
 
+//Function to generate a token for the login
 function genToken() {
 	var letters = "abcdefghiklmnopqrstuvwwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
 	var token = "";
@@ -115,19 +118,21 @@ function genToken() {
 	return token;
 }
 
+//Parse date from JS format to SQL format
 function parseDate(date) {
 	var ret;
 	ret = date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate();
 	return ret;
 }
 
+//Get a copy of an object (because js copies the reference, not the value)
 function clone(o) {
 	return JSON.parse(JSON.stringify(o));
 }
 
+//Get connection to the database from the pool
 function getConnection(cb) {
 	pool.getConnection(function(err, conn) {
-		//console.log("Connected successfully");
 		if (err) {
 			console.log(err);
 		} else {
@@ -137,21 +142,31 @@ function getConnection(cb) {
 	});
 }
 
+//Executes the given query in the given connection. Returns the rows from the query and the error if any
 function getDataFromDB(conn, q, cb) {
 	conn.query(q, function(err, rows) {
-		if (err) throw err;
-		cb(rows);
+		cb(rows, err);
 	});
 }
 
+//Only difference with getDataFromDB() is that, as there is no rows to return, callback function only gets the error
 function updateDB(conn, q, cb) {
 	conn.query(q, function(err) {
 		cb(err);
 	});
 }
 
+//  All responses have the same structure, which is {error, data}
+//  Error is a boolean that will be true if the operation functioned properly
+//  Data value varies. If error is true, data is a message of information to know
+//did the operation fail. If error is false, it's either a message saying that it
+//was successful, or the data that was requested
+//  The only exceptions are the login-related functions. Those exceptions will be
+//issued when appropriate.
+
 //GET requests routing
 
+//Frontpage routing
 app.get("/", function(req, rsp) {
 	rsp.sendFile(__dirname + "/static/index.html", function(err) {
 		if (err) console.log(err);
@@ -159,14 +174,9 @@ app.get("/", function(req, rsp) {
 	});
 });
 
+//Get the list of countries
 app.get("/g/countries", function(req, rsp) {
-	var params = [];
-	if (Object.size(req.query) >= 1) {
-		if (req.query.name) {
-			params.push("c_name LIKE '%" + req.query.name + "%'");
-		}
-	}
-	var q = new SQLSelect("l_countries", params);
+	var q = new SQLSelect("l_countries");
 	getConnection(function(conn, err) {
 		if (err) {
 			rsp.end(JSON.stringify({
@@ -192,6 +202,7 @@ app.get("/g/countries", function(req, rsp) {
 	});
 });
 
+//Get the list of leagues. Admits the parameter of country, to get all leagues from the given countries.
 app.get("/g/leagues", function(req, rsp) {
 	var params = [];
 	if (Object.size(req.query) >= 1) {
@@ -225,6 +236,7 @@ app.get("/g/leagues", function(req, rsp) {
 	});
 });
 
+//Get the list of the teams
 app.get("/g/teams", function(req, rsp) {
 	var q = new SQLSelect("l_teams");
 	if (Object.size(req.query) >= 1) {
@@ -341,6 +353,7 @@ app.get("/g/teams", function(req, rsp) {
 	}
 });
 
+//Get the list of users
 app.get("/g/users", function(req, rsp) {
 	var params = [];
 	if (Object.size(req.query) >= 1) {
@@ -377,6 +390,7 @@ app.get("/g/users", function(req, rsp) {
 	});
 });
 
+//Get the list of seasons, and the teams that are part of it.
 app.get("/g/seasons", function(req, rsp) {
 	var params = [];
 	if (Object.size(req.query) >= 1) {
@@ -434,6 +448,7 @@ app.get("/g/seasons", function(req, rsp) {
 	});
 });
 
+//Gets the list of rounds in a season. A round is the set of games that are played in a week.
 app.get("/g/rounds", function(req, rsp) {
 	var params = [];
 	if (Object.size(req.query) >= 1) {
@@ -470,6 +485,7 @@ app.get("/g/rounds", function(req, rsp) {
 	});
 });
 
+//Gets the list of games, and the list of events (goals and cards) of each of them
 app.get("/g/games", function(req, rsp) {
 	if (req.query.g_id) {
 		var ev = new SQLSelect("v_events", ["e_game="+req.query.g_id]);
@@ -478,7 +494,7 @@ app.get("/g/games", function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred when approaching the database"
+					data: "An error occurred when approaching the database"
 				}));
 				return;
 			}
@@ -486,7 +502,7 @@ app.get("/g/games", function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred when fetching data"
+						data: "An error occurred when fetching data"
 					}));
 					conn.release();
 					return;
@@ -530,14 +546,14 @@ app.get("/g/games", function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "Could not reach database"
+					data: "Could not reach database"
 				}));
 			} else {
 				getDataFromDB(conn, q.generate(), function(rows, err) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: "An error occurred when fetching data"
+							data: "An error occurred when fetching data"
 						}));
 						conn.release();
 						return;
@@ -573,6 +589,8 @@ app.get("/g/games", function(req, rsp) {
 	}
 });
 
+//  Initialization for the webpage. This gets the list of all the data types that are stored in the database
+//with only one database connection. Used like this to avoid hitting the max amount of connections in the database
 app.get("/g/init", function(req, rsp) {
 	getConnection(function(conn, err) {
 		if (err) {
@@ -587,7 +605,7 @@ app.get("/g/init", function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred when fetching data"
+					data: "An error occurred when fetching data"
 				}));
 				conn.release();
 				return;
@@ -755,6 +773,7 @@ app.get("/g/init", function(req, rsp) {
 	});
 });
 
+//Gets the rounds and games that are going to be played next for each league season
 app.get("/g/next_games", function(req, rsp) {
 	var rq = new SQLSelect("v_next_rounds");
 	var gq = new SQLSelect("v_next_games");
@@ -802,6 +821,7 @@ app.get("/g/next_games", function(req, rsp) {
 	});
 });
 
+//Gets all the teams that a player has played for, all the years that he's been playing.
 app.get("/g/career", function(req, rsp) {
 	if (req.query.p_id) {
 		var q = new SQLSelect("l_player_season", ["p_id="+req.query.p_id]);
@@ -836,6 +856,7 @@ app.get("/g/career", function(req, rsp) {
 	}	
 });
 
+//In a similar matter as the next_games route, it gets the last round that was played, and its games, for each league season
 app.get("/g/last_games", function(req, rsp) {
 	var rq = new SQLSelect("v_last_rounds");
 	var gq = new SQLSelect("v_last_games");
@@ -883,6 +904,7 @@ app.get("/g/last_games", function(req, rsp) {
 	});
 });
 
+//Gets the ranking of the teams in a league season
 app.get("/g/ranking", function(req, rsp) {
 	if (req.query.s_id) {
 		getConnection(function(conn, err) {
@@ -919,6 +941,13 @@ app.get("/g/ranking", function(req, rsp) {
 
 //POST request routing
 
+//The post routes are used to update or delete the existing data or to create more
+
+//Used to check the password and, if correct, return a login token
+//The returned data in this case has the structure {login, token, data}
+//Login is a boolean that is true for successful logins, or false else
+//The token is... the token
+//The data is the message that will tell which was the problem if any
 app.post("/p/login", urlenc, function(req, rsp) {
 	var u = req.body.username;
 	var p = req.body.password;
@@ -926,7 +955,7 @@ app.post("/p/login", urlenc, function(req, rsp) {
 		rsp.end(JSON.stringify({
 			login: false,
 			token: null,
-			msg: "Password or username missing in the request"
+			data: "Password or username missing in the request"
 		}));
 	} else {
 		getConnection(function(conn, err) {
@@ -934,7 +963,7 @@ app.post("/p/login", urlenc, function(req, rsp) {
 				rsp.end(JSON.stringify({
 					login: false,
 					token: null,
-					msg: "An error happened when trying to reach the database"
+					data: "An error happened when trying to reach the database"
 				}));
 			} else {
 				var q = new SQLSelect("l_users", ["u_name='"+u+"'"]);
@@ -943,7 +972,7 @@ app.post("/p/login", urlenc, function(req, rsp) {
 						rsp.end(JSON.stringify({
 							login: false,
 							token: null,
-							msg: "An error occurred"
+							data: "An error occurred"
 						}));
 						conn.release();
 					} else {
@@ -951,7 +980,7 @@ app.post("/p/login", urlenc, function(req, rsp) {
 							rsp.end(JSON.stringify({
 								login: false,
 								token: null,
-								msg: "Password or username incorrect"
+								data: "Password or username incorrect"
 							}));
 							conn.release();
 						} else {
@@ -960,7 +989,7 @@ app.post("/p/login", urlenc, function(req, rsp) {
 									rsp.end(JSON.stringify({
 										login: false,
 										token: null,
-										msg: "Password or username incorrect"
+										data: "Password or username incorrect"
 									}));
 									conn.release();
 								} else {
@@ -972,13 +1001,13 @@ app.post("/p/login", urlenc, function(req, rsp) {
 												rsp.end(JSON.stringify({
 													login: true,
 													token: token,
-													msg: "Login was successful"
+													data: "Login was successful"
 												}));
 											} else {
 												rsp.end(JSON.stringify({
 													login: false,
 													token: null,
-													msg: "An error occurred"
+													data: "An error occurred"
 												}));
 											}
 											conn.release();
@@ -987,7 +1016,7 @@ app.post("/p/login", urlenc, function(req, rsp) {
 										rsp.end(JSON.stringify({
 											login: false,
 											token: null,
-											msg: "Password or username incorrect"
+											data: "Password or username incorrect"
 										}));
 										conn.release();
 									}
@@ -1001,6 +1030,10 @@ app.post("/p/login", urlenc, function(req, rsp) {
 	}
 });
 
+//  Checks if the user is still logged in. If more than 30 minutes have passed since the login or
+//the last check, the login is considered expired.
+//  Also has a different return data structure, which is {login, data}, having the same meaning as
+//in the previous function
 app.post("/p/check_user", urlenc, function(req, rsp) {
 	var token = req.body.token;
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"], ["TIMESTAMPDIFF(MINUTE, u_lastlogin, NOW()) AS mins", "u_id"]);
@@ -1008,21 +1041,21 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				login: false,
-				msg: "An error happened when trying to reach the database"
+				data: "An error happened when trying to reach the database"
 			}));
 		} else {
 			getDataFromDB(conn, q.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						login: false,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 					conn.release();
 				} else {
 					if (rows.length === 0) {
 						rsp.end(JSON.stringify({
 							login: false,
-							msg: "No user was found with that token"
+							data: "No user was found with that token"
 						}));
 						conn.release();
 					} else if (rows[0].mins >= 60) {
@@ -1030,7 +1063,7 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 						updateDB(conn, "UPDATE l_users SET u_token=NULL WHERE u_id="+rows[0].u_id, function(err) {
 							rsp.end(JSON.stringify({
 								login:false, 
-								msg: "Your session has expired"
+								data: "Your session has expired"
 							}));
 							conn.release();
 						});
@@ -1040,12 +1073,12 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 							if (!err) {
 								rsp.end(JSON.stringify({
 									login: true,
-									msg: "No problem"
+									data: "No problem"
 								}));
 							} else {
 								rsp.end(JSON.stringify({
 									login: false,
-									msg: err.error
+									data: err.error
 								}));
 							}
 							conn.release();
@@ -1057,6 +1090,7 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 	});
 });
 
+//Checks the token and logs out the user to which the token belongs.
 app.post("/p/logout", urlenc, function(req, rsp) {
 	var token = req.body.token;
 	var q = new SQLSelect("l_users", ["u_token='"+token+"'"]);
@@ -1064,21 +1098,21 @@ app.post("/p/logout", urlenc, function(req, rsp) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "An error occurred"
+				data: "An error occurred"
 			}));
 		} else {
 			getDataFromDB(conn, q.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 					conn.release();
 				} else {
 					if (rows.length === 0) {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: "No user was found with that token"
+							data: "No user was found with that token"
 						}));
 						conn.release();
 					} else {
@@ -1088,12 +1122,12 @@ app.post("/p/logout", urlenc, function(req, rsp) {
 							if (!err) {
 								rsp.end(JSON.stringify({
 									error: false,
-									msg: "Logged out successfully"
+									data: "Logged out successfully"
 								}));
 							} else {
 								rsp.end(JSON.stringify({
 									error: true,
-									msg: err.error
+									data: err.error
 								}));
 							}
 							conn.release();
@@ -1105,12 +1139,14 @@ app.post("/p/logout", urlenc, function(req, rsp) {
 	});
 });
 
+//  Changes the password of the user to which the token belongs, always after checking that the
+//correct current password has been introduced
 app.post("/p/pass_ch", urlenc, function(req, rsp) {
 	getConnection(function(conn, err) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "An error occurred"
+				data: "An error occurred"
 			}));
 		} else {
 			var token = req.body.token;
@@ -1121,14 +1157,14 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 					conn.release();
 				} else {
 					if (rows.length === 0) {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: "No user was found with that token"
+							data: "No user was found with that token"
 						}));
 						conn.release();
 					} else {
@@ -1137,14 +1173,14 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 							if (err) {
 								rsp.end(JSON.stringify({
 									error: true,
-									msg: err.error
+									data: err.error
 								}));
 								conn.release();
 							}
 							if (!m) {
 								rsp.end(JSON.stringify({
 									error: true,
-									msg: "Incorrect password"
+									data: "Incorrect password"
 								}));
 								conn.release();
 							} else {
@@ -1152,7 +1188,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 									if (err) {
 										rsp.end(JSON.stringify({
 											error: true,
-											msg: err.error
+											data: err.error
 										}));
 										conn.release();
 									} else {
@@ -1160,7 +1196,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 											if (err) {
 												rsp.end(JSON.stringify({
 													error: true,
-													msg: err.error
+													data: err.error
 												}));
 												conn.release();
 											} else {
@@ -1169,12 +1205,12 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 													if (!err) {
 														rsp.end(JSON.stringify({
 															error: false,
-															msg: "Password changed successfully"
+															data: "Password changed successfully"
 														}));
 													} else {
 														rsp.end(JSON.stringify({
 															error: true,
-															msg: err.error
+															data: err.error
 														}));
 													}
 													conn.release();
@@ -1192,6 +1228,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 	});
 });
 
+//Registers a new user
 app.post("/p/register", urlenc, function(req, rsp) {
 	var n = req.body.username;
 	var p = req.body.password;
@@ -1199,21 +1236,21 @@ app.post("/p/register", urlenc, function(req, rsp) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: err.error
+				data: err.error
 			}));
 		} else {
 			bcrypt.hash(p, salt, function(err, hash) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: err.error
+						data: err.error
 					}));
 				} else {
 					getConnection(function(conn, err) {
 						if (err) {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: "An error occurred"
+								data: "An error occurred"
 							}));
 						} else {
 							var q = new SQLInsert("l_users", [n, hash], ["u_name", "u_password"]);
@@ -1221,12 +1258,12 @@ app.post("/p/register", urlenc, function(req, rsp) {
 								if (!err) {
 									rsp.end(JSON.stringify({
 										error: false,
-										msg: "User created successfully"
+										data: "User created successfully"
 									}));
 								} else {
 									rsp.end(JSON.stringify({
 										error:true,
-										msg: err
+										data: err
 									}));
 								}
 								conn.release();
@@ -1239,6 +1276,7 @@ app.post("/p/register", urlenc, function(req, rsp) {
 	});
 });
 
+//Used to create a new country or to change the information of an existing one
 app.post("/p/ch_country", urlenc, function(req, rsp) {
 	var id = req.body.c_id;
 	if (id === undefined) {
@@ -1257,7 +1295,7 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 				} else {
 					var q = new SQLInsert("l_countries", values, cols);
@@ -1265,12 +1303,12 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 						if (!err) {
 							rsp.end(JSON.stringify({
 								error: false,
-								msg: "New country created correctly"
+								data: "New country created correctly"
 							}));
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: err.error
+								data: err.error
 							}));
 						}
 						conn.release();
@@ -1280,7 +1318,7 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 		} else {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "Not enough information to create a country instance"
+				data: "Not enough information to create a country instance"
 			}));
 		}
 	} else {
@@ -1296,19 +1334,19 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				updateDB(conn, q.generate(), function(err) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Country updated successfully"
+							data: "Country updated successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1318,6 +1356,7 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes a country
 app.post("/p/del_country", urlenc, function(req, rsp) {
 	var id = req.body.c_id;
 	if (id !== undefined) {
@@ -1325,7 +1364,7 @@ app.post("/p/del_country", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLDelete("l_countries", ["c_id="+id]);
@@ -1333,12 +1372,12 @@ app.post("/p/del_country", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Country deleted successfully"
+							data: "Country deleted successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1348,11 +1387,12 @@ app.post("/p/del_country", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "The country's ID is required"
+			data: "The country's ID is required"
 		}));
 	}
 });
 
+//Used to create a new league or to change the information of an existing one
 app.post("/p/ch_league", urlenc, function(req, rsp) {
 	var id = req.body.l_id;
 	if (id === undefined) {
@@ -1375,7 +1415,7 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 				} else {
 					var q = new SQLInsert("l_leagues", values, cols);
@@ -1383,12 +1423,12 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 						if (!err) {
 							rsp.end(JSON.stringify({
 								error: false,
-								msg: "New league created correctly"
+								data: "New league created correctly"
 							}));
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: err.error
+								data: err.error
 							}));
 						}
 						conn.release();
@@ -1398,7 +1438,7 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 		} else {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "Not enough information to create a league instance"
+				data: "Not enough information to create a league instance"
 			}));
 		}
 	} else {
@@ -1416,7 +1456,7 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLUpdate("l_leagues", asgs, ["l_id="+id]);
@@ -1424,12 +1464,12 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "League updated successfully"
+							data: "League updated successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1439,6 +1479,7 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes an existing league
 app.post("/p/del_league", urlenc, function(req, rsp) {
 	var id = req.body.l_id;
 	if (id !== undefined) {
@@ -1446,7 +1487,7 @@ app.post("/p/del_league", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLDelete("l_leagues", ["l_id="+id]);
@@ -1454,12 +1495,12 @@ app.post("/p/del_league", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "League deleted successfully"
+							data: "League deleted successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1469,11 +1510,12 @@ app.post("/p/del_league", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "The league's ID is required"
+			data: "The league's ID is required"
 		}));
 	}
 });
 
+//Used to create a new season or to change the information of an existing one
 app.post("/p/ch_season", urlenc, function(req, rsp) {
 	var id = req.body.s_id;
 	if (id === undefined) {
@@ -1496,7 +1538,7 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 				} else {
 					var q = new SQLInsert("l_seasons", values, cols);
@@ -1504,12 +1546,12 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 						if (!err) {
 							rsp.end(JSON.stringify({
 								error: false,
-								msg: "New season created correctly"
+								data: "New season created correctly"
 							}));
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: err.error
+								data: err.error
 							}));
 						}
 						conn.release();
@@ -1519,7 +1561,7 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 		} else {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "Not enough information to create a season instance"
+				data: "Not enough information to create a season instance"
 			}));
 		}
 	} else {
@@ -1534,7 +1576,7 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLUpdate("l_seasons", asgs, ["s_id="+id]);
@@ -1542,12 +1584,12 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Season updated successfully"
+							data: "Season updated successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err
+							data: err
 						}));
 					}
 					conn.release();
@@ -1557,6 +1599,7 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes an existing season
 app.post("/p/del_season", urlenc, function(req, rsp) {
 	var id = req.body.s_id;
 	if (id !== undefined) {
@@ -1564,7 +1607,7 @@ app.post("/p/del_season", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLDelete("l_seasons", ["s_id="+id]);
@@ -1572,12 +1615,12 @@ app.post("/p/del_season", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Season deleted successfully"
+							data: "Season deleted successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1587,11 +1630,12 @@ app.post("/p/del_season", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "The season's ID is required"
+			data: "The season's ID is required"
 		}));
 	}
 });
 
+//Used to create a new team or to change the information of an existing one
 app.post("/p/ch_team", urlenc, function(req, rsp) {
 	var id = req.body.t_id;
 	if (id === undefined) {
@@ -1622,7 +1666,7 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 				} else {
 					var q = new SQLInsert("l_teams", values, cols);
@@ -1630,12 +1674,12 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 						if (!err) {
 							rsp.end(JSON.stringify({
 								error: false,
-								msg: "New team created correctly"
+								data: "New team created correctly"
 							}));
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: err.error
+								data: err.error
 							}));
 						}
 						conn.release();
@@ -1645,7 +1689,7 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 		} else {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "Not enough information to create a team instance"
+				data: "Not enough information to create a team instance"
 			}));
 		}
 	} else {
@@ -1664,7 +1708,7 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLUpdate("l_teams", asgs, ["t_id="+id]);
@@ -1672,12 +1716,12 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Team updated successfully"
+							data: "Team updated successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err
+							data: err
 						}));
 					}
 					conn.release();
@@ -1687,6 +1731,7 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes an existing team
 app.post("/p/del_team", urlenc, function(req, rsp) {
 	var id = req.body.t_id;
 	if (id !== undefined) {
@@ -1694,7 +1739,7 @@ app.post("/p/del_team", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLDelete("l_teams", ["t_id="+id]);
@@ -1702,12 +1747,12 @@ app.post("/p/del_team", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Team deleted successfully"
+							data: "Team deleted successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1717,11 +1762,12 @@ app.post("/p/del_team", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "The team's ID is required"
+			data: "The team's ID is required"
 		}));
 	}
 });
 
+//Signs up a team for a season, this meaning that said team will participate in said season
 app.post("/p/add_team_season", urlenc, function(req, rsp) {
 	if (Object.size(req.body) >= 2) {
 		if (req.body.s_id && req.body.t_id) {
@@ -1731,7 +1777,7 @@ app.post("/p/add_team_season", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred"
+						data: "An error occurred"
 					}));
 				} else {
 					var q = new SQLInsert("l_team_season", values, cols);
@@ -1739,12 +1785,12 @@ app.post("/p/add_team_season", urlenc, function(req, rsp) {
 						if (!err) {
 							rsp.end(JSON.stringify({
 								error: false,
-								msg: "Team was signed up correctly"
+								data: "Team was signed up correctly"
 							}));
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: err.error
+								data: err.error
 							}));
 						}
 						conn.release();
@@ -1754,24 +1800,25 @@ app.post("/p/add_team_season", urlenc, function(req, rsp) {
 		} else {
 			rsp.end(JSON.stringify({
 				error: true,
-				msg: "Team and season IDs are required"
+				data: "Team and season IDs are required"
 			}));
 		}
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "Team and season IDs are required"
+			data: "Team and season IDs are required"
 		}));
 	}
 });
 
+//Undoes the sign up of the previous function
 app.post("/p/del_team_season", urlenc, function(req, rsp) {
 	if (req.body.t_id && req.body.s_id) {
 		getConnection(function(conn, err) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred"
+					data: "An error occurred"
 				}));
 			} else {
 				var q = new SQLDelete("l_team_season", ["t_id="+req.body.t_id, "s_id="+req.body.s_id]);
@@ -1779,12 +1826,12 @@ app.post("/p/del_team_season", urlenc, function(req, rsp) {
 					if (!err) {
 						rsp.end(JSON.stringify({
 							error: false,
-							msg: "Team signed out successfully"
+							data: "Team signed out successfully"
 						}));
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err.error
+							data: err.error
 						}));
 					}
 					conn.release();
@@ -1794,18 +1841,21 @@ app.post("/p/del_team_season", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "The team's ID is required"
+			data: "The team's ID is required"
 		}));
 	}
 });
 
+//Function to fast create rounds for a season, depending on the number of teams of said season
+//This function takes for granted that the number of rounds equals (#ofTeams - 1) * 2
+//i.e., each team will play twice against the other teams
 app.post("/p/fc", urlenc, function(req, rsp) {
 	if (req.body.s_id && req.body.date && req.body.amount && req.body.s_desc) {
 		getConnection(function(conn, err) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred when connecting to the database"
+					data: "An error occurred when connecting to the database"
 				}));
 			} else {
 				var date = new Date(req.body.date);
@@ -1813,7 +1863,7 @@ app.post("/p/fc", urlenc, function(req, rsp) {
 				if (last <= 0) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "Too few teams"
+						data: "Too few teams"
 					}));
 					conn.release();
 				} else {
@@ -1831,12 +1881,12 @@ app.post("/p/fc", urlenc, function(req, rsp) {
 						if (err) {
 							rsp.end(JSON.stringify({
 								error: true,
-								msg: "Something went wrong and the rounds could not be created"
+								data: "Something went wrong and the rounds could not be created"
 							}));
 						} else {
 							rsp.end(JSON.stringify({
 								error: false,
-								msg: "Rounds created"
+								data: "Rounds created"
 							}));
 						}
 						conn.release();
@@ -1847,11 +1897,12 @@ app.post("/p/fc", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "Some parameters are missing"
+			data: "Some parameters are missing"
 		}));
 	}
 });
 
+//Used to change the information of an existing round
 app.post("/p/ch_round", urlenc, function(req, rsp) {
 	if (req.body.r_number && req.body.r_week && req.body.r_desc && req.body.r_id) {
 		var assigns = [];
@@ -1895,18 +1946,19 @@ app.post("/p/ch_round", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "Some parameters are missing"
+			data: "Some parameters are missing"
 		}));
 	}
 });
 
+//Deletes a round from the database
 app.post("/p/del_round", urlenc, function(req, rsp) {
 	if (req.body.r_id) {
 		getConnection(function(conn, err) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: err
+					data: err
 				}));
 			} else {
 				var q = new SQLDelete("l_rounds", ["r_id="+req.body.r_id]);
@@ -1914,7 +1966,7 @@ app.post("/p/del_round", urlenc, function(req, rsp) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							msg: err
+							data: err
 						}));
 						conn.release();
 					} else {
@@ -1939,11 +1991,12 @@ app.post("/p/del_round", urlenc, function(req, rsp) {
 	} else {
 		rsp.end(JSON.stringify({
 			error: true,
-			msg: "Some parameters are missing"
+			data: "Some parameters are missing"
 		}));
 	}
 });
 
+//Used to create a new game or to change the information of an existing one
 app.post("/p/ch_game", urlenc, function(req, rsp) {
 	if (req.body.g_id) {
 		var as = [];
@@ -2071,6 +2124,7 @@ app.post("/p/ch_game", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes an existing game
 app.post("/p/del_game", urlenc, function(req, rsp) {
 	if (req.body.g_id) {
 		var id = req.body.g_id;
@@ -2106,6 +2160,7 @@ app.post("/p/del_game", urlenc, function(req, rsp) {
 	}
 });
 
+//Used to create a new player or to change the information of an existing one
 app.post("/p/ch_player", urlenc, function(req, rsp) {
 	if (req.body.p_id) {
 		var as = [];
@@ -2208,6 +2263,7 @@ app.post("/p/ch_player", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes an existing player
 app.post("/p/del_player", urlenc, function(req, rsp) {
 	if (req.body.p_id) {
 		var q = new SQLDelete("l_players", ["p_id="+req.body.p_id]);
@@ -2252,6 +2308,7 @@ app.post("/p/del_player", urlenc, function(req, rsp) {
 	}
 });
 
+//Signs a player up for a team for one season
 app.post("/p/ch_career", urlenc, function(req, rsp) {
 	if (req.body.p_id && req.body.t_id && req.body.s_id) {
 		var values = [], cols = [];
@@ -2314,6 +2371,7 @@ app.post("/p/ch_career", urlenc, function(req, rsp) {
 	}
 });
 
+//Deletes one of the signs up
 app.post("/p/del_career", urlenc, function(req, rsp) {
 	if (req.body.p_id && req.body.s_id && req.body.t_id) {
 		var w = [];
@@ -2362,6 +2420,7 @@ app.post("/p/del_career", urlenc, function(req, rsp) {
 	}
 });
 
+//Used to create a new goal
 app.post("/p/ch_goal", urlenc, function(req, rsp) {
 	var vals = [], cols = [];
 	if (req.body.g_game) {
@@ -2443,6 +2502,7 @@ app.post("/p/ch_goal", urlenc, function(req, rsp) {
 	});
 });
 
+//Deletes an existing goal
 app.post("/p/del_goal", urlenc, function(req, rsp) {
 	if (req.body.g_id && req.body.g_game) {
 		var id = req.body.g_id;
@@ -2451,7 +2511,7 @@ app.post("/p/del_goal", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred when approaching the database"
+					data: "An error occurred when approaching the database"
 				}));
 				return;
 			}
@@ -2459,7 +2519,7 @@ app.post("/p/del_goal", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred when deleting the goal from the database"
+						data: "An error occurred when deleting the goal from the database"
 					}));
 					conn.release();
 					return;
@@ -2503,6 +2563,7 @@ app.post("/p/del_goal", urlenc, function(req, rsp) {
 	}
 });
 
+//Used to create a new card
 app.post("/p/ch_card", urlenc, function(req, rsp) {
 	var vals = [], cols = [];
 	if (req.body.c_player) {
@@ -2576,6 +2637,7 @@ app.post("/p/ch_card", urlenc, function(req, rsp) {
 	});
 });
 
+//Deletes an existing card
 app.post("/p/del_card", urlenc, function(req, rsp) {
 	if (req.body.c_id && req.body.c_game) {
 		var id = req.body.c_id;
@@ -2584,7 +2646,7 @@ app.post("/p/del_card", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					msg: "An error occurred when approaching the database"
+					data: "An error occurred when approaching the database"
 				}));
 				return;
 			}
@@ -2592,7 +2654,7 @@ app.post("/p/del_card", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						msg: "An error occurred when deleting the goal from the database"
+						data: "An error occurred when deleting the goal from the database"
 					}));
 					conn.release();
 					return;
@@ -2636,6 +2698,7 @@ app.post("/p/del_card", urlenc, function(req, rsp) {
 	}
 });
 
+//Opens a port
 app.listen(process.env.PORT || 5000, function() {
 	console.log("Listening to port 5000");
 });

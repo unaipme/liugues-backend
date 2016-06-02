@@ -188,7 +188,7 @@ app.get("/g/countries", function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err
+						data: "An error happened when fetching the data from the database"
 					}));
 				} else {
 					rsp.end(JSON.stringify({
@@ -222,7 +222,7 @@ app.get("/g/leagues", function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err
+						data: "An error happened when fetching the data from the database"
 					}));
 				} else {
 					rsp.end(JSON.stringify({
@@ -249,7 +249,7 @@ app.get("/g/teams", function(req, rsp) {
 					}));
 					return;
 				} 
-				var q1 = new SQLSelect("l_team_season ts, l_seasons s", ["s.s_id=ts.s_id", "ts.t_id="+req.query.t_id], ["s.*"]);
+				var q1 = new SQLSelect("l_team_season ts, v_seasons s", ["s.s_id=ts.s_id", "ts.t_id="+req.query.t_id], ["s.*"]);
 				getDataFromDB(conn, q1.generate(), function(seasons, err) {
 					if (err) {
 						rsp.end(JSON.stringify({
@@ -322,7 +322,7 @@ app.get("/g/teams", function(req, rsp) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err
+							data: "An error happened when fetching the data from the database"
 						}));
 						conn.release();
 						return;
@@ -376,7 +376,7 @@ app.get("/g/users", function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err
+						data: "An error happened when fetching the data from the database"
 					}));
 				} else {
 					rsp.end(JSON.stringify({
@@ -412,12 +412,12 @@ app.get("/g/seasons", function(req, rsp) {
 				data: "An error happened when trying to reach the database"
 			}));
 		} else {
-			var q = new SQLSelect("l_seasons s, l_leagues l", params, ["s.*, l.l_country"]);
+			var q = new SQLSelect("v_seasons s", params);
 			getDataFromDB(conn, q.generate(), function(rows, err) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err
+						data: "An error happened when fetching the data from the database"
 					}));
 				} else {
 					var q2 = new SQLSelect("l_teams t, l_team_season ts", ["ts.t_id=t.t_id"], ["t.*, ts.s_id"]);
@@ -425,7 +425,7 @@ app.get("/g/seasons", function(req, rsp) {
 						if (err2) {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err2
+								data: "An error happened when fetching the data from the database"
 							}));
 							conn.release();
 						} else {
@@ -471,7 +471,7 @@ app.get("/g/rounds", function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err
+						data: "An error happened when fetching the data from the database"
 					}));
 				} else {
 					rsp.end(JSON.stringify({
@@ -684,7 +684,7 @@ app.get("/g/init", function(req, rsp) {
 										});
 										games[i].events = l;
 									}
-									var q = new SQLSelect("l_seasons");
+									var q = new SQLSelect("v_seasons");
 									getDataFromDB(conn, q.generate(), function(seasons, err) {
 										if (err) {
 											rsp.end(JSON.stringify({
@@ -1048,7 +1048,7 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						login: false,
-						data: "An error occurred"
+						data: "An error happened when fetching the data from the database"
 					}));
 					conn.release();
 				} else {
@@ -1078,7 +1078,7 @@ app.post("/p/check_user", urlenc, function(req, rsp) {
 							} else {
 								rsp.end(JSON.stringify({
 									login: false,
-									data: err.error
+									data: "An error happened when updating the database"
 								}));
 							}
 							conn.release();
@@ -1127,7 +1127,7 @@ app.post("/p/logout", urlenc, function(req, rsp) {
 							} else {
 								rsp.end(JSON.stringify({
 									error: true,
-									data: err.error
+									data: "An error happened when updating the database"
 								}));
 							}
 							conn.release();
@@ -1173,7 +1173,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 							if (err) {
 								rsp.end(JSON.stringify({
 									error: true,
-									data: err.error
+									data: "An error occurred when comparing the passwords. Try again"
 								}));
 								conn.release();
 							}
@@ -1188,7 +1188,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 									if (err) {
 										rsp.end(JSON.stringify({
 											error: true,
-											data: err.error
+											data: "An error occurred when encrypting the password. Try again"
 										}));
 										conn.release();
 									} else {
@@ -1196,7 +1196,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 											if (err) {
 												rsp.end(JSON.stringify({
 													error: true,
-													data: err.error
+													data: "An error occurred when encrypting the password. Try again"
 												}));
 												conn.release();
 											} else {
@@ -1210,7 +1210,7 @@ app.post("/p/pass_ch", urlenc, function(req, rsp) {
 													} else {
 														rsp.end(JSON.stringify({
 															error: true,
-															data: err.error
+															data: "An error occurred when updating the database"
 														}));
 													}
 													conn.release();
@@ -1236,14 +1236,14 @@ app.post("/p/register", urlenc, function(req, rsp) {
 		if (err) {
 			rsp.end(JSON.stringify({
 				error: true,
-				data: err.error
+				data: "An error occurred when encrypting the password. Try again."
 			}));
 		} else {
 			bcrypt.hash(p, salt, function(err, hash) {
 				if (err) {
 					rsp.end(JSON.stringify({
 						error: true,
-						data: err.error
+						data: "An error occurred when encrypting the password. Try again"
 					}));
 				} else {
 					getConnection(function(conn, err) {
@@ -1263,7 +1263,7 @@ app.post("/p/register", urlenc, function(req, rsp) {
 								} else {
 									rsp.end(JSON.stringify({
 										error:true,
-										data: err
+										data: "An error occurred when updating the database"
 									}));
 								}
 								conn.release();
@@ -1308,7 +1308,7 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err.error
+								data: "An error occurred when updating the database"
 							}));
 						}
 						conn.release();
@@ -1346,7 +1346,7 @@ app.post("/p/ch_country", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data:"An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1377,7 +1377,7 @@ app.post("/p/del_country", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1428,7 +1428,7 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err.error
+								data: "An error occurred when updating the database"
 							}));
 						}
 						conn.release();
@@ -1469,7 +1469,7 @@ app.post("/p/ch_league", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1500,7 +1500,7 @@ app.post("/p/del_league", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1551,7 +1551,7 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err.error
+								data: "An error occurred when updating the database"
 							}));
 						}
 						conn.release();
@@ -1589,7 +1589,7 @@ app.post("/p/ch_season", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1620,7 +1620,7 @@ app.post("/p/del_season", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1679,7 +1679,7 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err.error
+								data: "An error occurred when updating the database"
 							}));
 						}
 						conn.release();
@@ -1721,7 +1721,7 @@ app.post("/p/ch_team", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1752,7 +1752,7 @@ app.post("/p/del_team", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1790,7 +1790,7 @@ app.post("/p/add_team_season", urlenc, function(req, rsp) {
 						} else {
 							rsp.end(JSON.stringify({
 								error: true,
-								data: err.error
+								data: "An error occurred when updating the database"
 							}));
 						}
 						conn.release();
@@ -1831,7 +1831,7 @@ app.post("/p/del_team_season", urlenc, function(req, rsp) {
 					} else {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err.error
+							data: "An error occurred when updating the database"
 						}));
 					}
 					conn.release();
@@ -1958,7 +1958,7 @@ app.post("/p/del_round", urlenc, function(req, rsp) {
 			if (err) {
 				rsp.end(JSON.stringify({
 					error: true,
-					data: err
+					data: "An error occurred when approaching the database"
 				}));
 			} else {
 				var q = new SQLDelete("l_rounds", ["r_id="+req.body.r_id]);
@@ -1966,7 +1966,7 @@ app.post("/p/del_round", urlenc, function(req, rsp) {
 					if (err) {
 						rsp.end(JSON.stringify({
 							error: true,
-							data: err
+							data: "An error occurred when updating the database"
 						}));
 						conn.release();
 					} else {
